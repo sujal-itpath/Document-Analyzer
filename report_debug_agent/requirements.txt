@@ -1,0 +1,9 @@
+langchain
+langchain-core
+langchain-google-genai
+langchain-chroma
+langgraph
+langchain-community
+pypdf
+python-dotenv
+langgraph-checkpoint-sqlite
