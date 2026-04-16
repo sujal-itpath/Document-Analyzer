@@ -1,7 +1,7 @@
 import os
 import shutil
 from dotenv import load_dotenv
-from langchain_community.document_loaders import TextLoader, PyPDFLoader
+from langchain_community.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
@@ -23,6 +23,8 @@ def setup_vector_store(file_paths: list[str]):
         
         if file_path.endswith('.pdf'):
             loader = PyPDFLoader(file_path)
+        elif file_path.endswith('.docx'):
+            loader = Docx2txtLoader(file_path)
         else:
             loader = TextLoader(file_path, encoding='utf-8')
             

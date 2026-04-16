@@ -11,7 +11,7 @@ def main():
     print("Welcome to the Document Analysis Agent!")
     print("="*50)
     
-    file_path = input("\nEnter the path to the document you want to analyze (e.g., sample.pdf):\n> ")
+    file_path = input("\nEnter the path to the document you want to analyze (e.g., sample.pdf, report.docx, notes.txt):\n> ")
     if not os.path.exists(file_path):
         print(f"Error: File '{file_path}' not found.")
         return

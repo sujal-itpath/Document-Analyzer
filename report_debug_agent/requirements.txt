@@ -7,3 +7,4 @@ langchain-community
 pypdf
 python-dotenv
 langgraph-checkpoint-sqlite
+docx2txt
