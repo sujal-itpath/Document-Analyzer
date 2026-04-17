@@ -29,6 +29,7 @@ Thumbs.db
 *.sqlite-wal
 *.shm
 *.wal
+*.bin
 
 # Build artifacts
 build/
@@ -42,5 +43,3 @@ htmlcov/
 # Secrets
 *.pem
 *.key
-
-.bin
