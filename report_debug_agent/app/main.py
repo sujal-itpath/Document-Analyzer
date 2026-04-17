@@ -21,7 +21,7 @@ def main():
         retriever = setup_vector_store([file_path])
         docs = retriever.invoke(" ")
         if docs:
-            print(f"\n[System Verification] Successfully indexed document. Sample phrase: '{docs[0].page_content[:60]}...'")
+            print(f"\n[System Verification] Successfully indexed document.")
     except Exception as e:
         print(f"Error setting up vector store: {e}")
         return

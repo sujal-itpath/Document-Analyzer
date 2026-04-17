@@ -35,7 +35,7 @@ def run_agent(user_input: str, thread_id: str = "1"):
     """
     Runs the agent and returns the final cleaned response text.
     """
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {"configurable": {"thread_id": thread_id}} 
     inputs = {"messages": [("user", user_input)]}
     
     response = agent_executor.invoke(inputs, config=config)
