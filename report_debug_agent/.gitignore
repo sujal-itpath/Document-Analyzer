@@ -24,6 +24,9 @@ Thumbs.db
 *.log
 *.db
 *.sqlite3
+*.sqlite
+*.shm
+*.wal
 
 # Build artifacts
 build/
