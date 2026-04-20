@@ -8,3 +8,7 @@ pypdf
 python-dotenv
 langgraph-checkpoint-sqlite
 docx2txt
+fastapi
+uvicorn
+pydantic
+python-multipart
