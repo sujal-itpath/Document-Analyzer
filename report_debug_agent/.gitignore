@@ -43,3 +43,5 @@ htmlcov/
 # Secrets
 *.pem
 *.key
+
+uploads/
