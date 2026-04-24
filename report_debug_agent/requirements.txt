@@ -12,3 +12,5 @@ fastapi
 uvicorn
 pydantic
 python-multipart
+aiosqlite
+langchain-groq

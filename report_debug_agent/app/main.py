@@ -6,7 +6,9 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rag.vector_store import setup_vector_store
 from agent.agent import run_agent
 
-def main():
+import asyncio
+
+async def main():
     print("="*50)
     print("Welcome to the Document Analysis Agent!")
     print("="*50)
@@ -37,18 +39,18 @@ def main():
         
         if user_input.lower() in ['exit', 'quit']:
             print("Session ended. Goodbye!")
-            break
+            break   
             
         if not user_input.strip():
             continue
-            
+                
         print("Agent thinking...")
         try:
-            response = run_agent(user_input, thread_id=thread_id)
+            response = await run_agent(user_input, thread_id=thread_id)
             print(f"\nAgent:\n{response}\n")
             print("-" * 50)
         except Exception as e:
             print(f"An error occurred during agent execution: {e}")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

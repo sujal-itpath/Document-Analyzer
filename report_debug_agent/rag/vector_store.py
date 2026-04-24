@@ -10,7 +10,7 @@ load_dotenv()
 
 _retriever = None
 
-def setup_vector_store(file_paths: list[str]):
+def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     """
     Loads documents, splits them into chunks, and stores them in ChromaDB.
     Returns a retriever object.
@@ -35,6 +35,8 @@ def setup_vector_store(file_paths: list[str]):
         all_docs.extend(docs)
         
     if not all_docs:
+        if not overwrite and _retriever:
+            return _retriever
         raise ValueError(f"Failed to load any readable text from the provided files.")
     
     print(f"Documents loaded. Splitting into chunks...")
@@ -53,22 +55,31 @@ def setup_vector_store(file_paths: list[str]):
     
     persist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
     
-    if os.path.exists(persist_dir):
+    if overwrite and os.path.exists(persist_dir):
         try:
             shutil.rmtree(persist_dir)
             print(f"Cleared previous vector store at {persist_dir} to start fresh.")
         except Exception as e:
             print(f"Warning: Could not clear previous vector store: {e}")
 
-    vectorstore = Chroma.from_documents(
-        documents=splits, 
-        embedding=embeddings,
-        persist_directory=persist_dir
-    )
+    if not overwrite and os.path.exists(persist_dir):
+        vectorstore = Chroma(
+            persist_directory=persist_dir,
+            embedding_function=embeddings
+        )
+        vectorstore.add_documents(documents=splits)
+        print(f"Added {len(splits)} chunks to existing vector store.")
+    else:
+        vectorstore = Chroma.from_documents(
+            documents=splits, 
+            embedding=embeddings,
+            persist_directory=persist_dir
+        )
+        print(f"Created new vector store with {len(splits)} chunks.")
 
-    _retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+    _retriever = vectorstore.as_retriever(search_kwargs={"k": 5}) # Increased k for multi-doc
      
-    print("Vector store setup complete (Cloud Embeddings).")
+    print("Vector store setup complete.")
     return _retriever
 
 def get_retriever():
