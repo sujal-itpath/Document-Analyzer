@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from langchain_community.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+from langchain_ollama import OllamaEmbeddings
 
 load_dotenv()
 
@@ -49,9 +49,12 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     if not splits:
         raise ValueError(f"Failed to generate chunks from the documents.")
     
-    print(f"Created {len(splits)} chunks. Initializing Google Generative AI Embeddings and ChromaDB...")
+    embeddings = OllamaEmbeddings(
+        base_url="http://192.168.1.240:11434",
+        model="nomic-embed-text:latest"  # Updated to available embedding model
+    )
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
+    print(f"Created {len(splits)} chunks. Initializing Ollama Embeddings ({embeddings.model}) and ChromaDB...")
     
     persist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
     
@@ -59,8 +62,9 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
         try:
             shutil.rmtree(persist_dir)
             print(f"Cleared previous vector store at {persist_dir} to start fresh.")
-        except Exception as e:
-            print(f"Warning: Could not clear previous vector store: {e}")
+        except Exception:
+            # Silently continue if directory is locked; Chroma will handle existing data
+            pass
 
     if not overwrite and os.path.exists(persist_dir):
         vectorstore = Chroma(
@@ -77,8 +81,7 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
         )
         print(f"Created new vector store with {len(splits)} chunks.")
 
-    _retriever = vectorstore.as_retriever(search_kwargs={"k": 5}) # Increased k for multi-doc
-     
+    _retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
     print("Vector store setup complete.")
     return _retriever
 

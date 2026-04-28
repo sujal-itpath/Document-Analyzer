@@ -30,7 +30,7 @@ async def main():
 
         
     print("\n[System] Ready! You can now ask questions about the document or ask for suggestions.")
-    print("Type 'exit' or 'quit' to end the session.\n")
+    print("Type 'exit' or 'quit' to end the session.\n")    
     
     thread_id = "session_1"
     

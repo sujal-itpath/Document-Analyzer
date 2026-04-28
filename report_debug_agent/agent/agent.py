@@ -2,18 +2,18 @@ import os
 import ast
 import json
 from dotenv import load_dotenv
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_ollama import ChatOllama
 from langgraph.prebuilt import create_react_agent
 from configs.tools_config import TOOLS
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 load_dotenv()
 
-# Using gemini-flash-latest for robust tool calling on the free tier
-llm = ChatGoogleGenerativeAI(
-    model="gemini-flash-latest",
-    temperature=0,
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+# Using local Ollama endpoint for chat
+llm = ChatOllama(
+    base_url="http://192.168.1.240:11434",
+    model="gemma4:e4b",  # Updated to available model
+    temperature=0
 )
 
 

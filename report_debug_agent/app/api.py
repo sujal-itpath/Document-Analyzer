@@ -5,7 +5,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -63,9 +63,10 @@ class QuestionRequest(BaseModel):
 
 
 @app.post("/upload")
-async def upload_documents(files: list[UploadFile] = File(...), overwrite: bool = True):
+async def upload_documents(files: list[UploadFile] = File(...), overwrite: str = Form("true")):
     """Upload one or more documents, save them locally, and update the vector store."""
     global retriever
+    is_overwrite = overwrite.lower() == "true"
     try:
         file_paths = []
         filenames = []
@@ -77,7 +78,7 @@ async def upload_documents(files: list[UploadFile] = File(...), overwrite: bool 
             filenames.append(file.filename)
 
         # Initialize or update vector store with the uploaded files
-        retriever = setup_vector_store(file_paths, overwrite=overwrite)
+        retriever = setup_vector_store(file_paths, overwrite=is_overwrite)
         _ = retriever.invoke(" ")
 
         return {
@@ -87,6 +88,8 @@ async def upload_documents(files: list[UploadFile] = File(...), overwrite: bool 
             "overwrite": overwrite
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
@@ -134,6 +137,8 @@ async def ask_question(request: QuestionRequest):
             async for token in run_agent_stream(request.question, thread_id=request.thread_id):
                 yield token
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             yield f"Error: {str(e)}"
 
     return StreamingResponse(event_generator(), media_type="text/plain")

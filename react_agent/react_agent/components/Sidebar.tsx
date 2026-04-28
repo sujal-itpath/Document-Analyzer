@@ -49,7 +49,7 @@ const Sidebar: React.FC<SidebarProps> = ({ history, currentSessionId, onSelectSe
               </button>
             ))
           )}
-        </div>
+        </div>                                            
       </div>
 
       <div className="p-4 border-t border-white/5 mt-auto">

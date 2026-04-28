@@ -15,15 +15,17 @@ interface ChatInterfaceProps {
   isThinking: boolean;
   onSendMessage: (e?: React.FormEvent) => void;
   onClearChat: () => void;
+  mode: 'single' | 'multi';
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
-  messages,
+  messages, 
   inputText,
   setInputText,
   isThinking,
   onSendMessage,
-  onClearChat
+  onClearChat,
+  mode
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -42,14 +44,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-700">
              <div className="w-16 h-16 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-6">
-               <Bot size={32} className="text-blue-500" />
+               <Bot size={32} className="text-blue-500"/>
              </div>
-             <h3 className="text-xl font-bold mb-2">How can I help you today?</h3>
-              <p className="text-zinc-500 text-sm max-w-md">
-                I&apos;ve analyzed your document. You can ask me to summarize it, find specific details, or explain complex sections.
+             <h3 className="text-xl font-bold mb-2">
+               {mode === 'single' ? 'Analyzing your document...' : 'Comparing your documents...'}
+             </h3>
+              <p className="text-zinc-500 text-sm max-w-md">  
+                {mode === 'single' 
+                  ? "I've analyzed your document. You can ask me to summarize it, find specific details, or explain complex sections."
+                  : "I've indexed your documents. You can ask me to compare them, find contradictions, or summarize key differences."}
               </p>
           </div>
-        ) : (
+        ) : ( 
           messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`flex gap-4 max-w-[95%] md:max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
@@ -58,7 +64,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   ${msg.role === 'user' ? 'bg-blue-600' : 'bg-zinc-900 border border-white/10'}
                 `}>
                   {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
-                </div>
+                </div> 
                 <div className={`
                   p-4 md:p-5 rounded-2xl text-[15px] leading-relaxed shadow-sm
                   ${msg.role === 'user' 
@@ -99,7 +105,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                                         icon.classList.add('hidden');
                                         check.classList.remove('hidden');
                                         setTimeout(() => {
-                                          icon.classList.remove('hidden');
+                                          icon.classList.remove('hidden');  
                                           check.classList.add('hidden');
                                         }, 2000);
                                       }
@@ -165,7 +171,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             type="text"
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Ask a question about the document..."
+            placeholder={mode === 'single' ? "Ask a question about the document..." : "Ask a question or compare documents..."}
             className="relative w-full bg-zinc-900/50 border border-white/10 rounded-2xl py-4 pl-6 pr-14 focus:outline-none focus:border-blue-500/50 transition-all placeholder:text-zinc-600 text-sm md:text-base"
             disabled={isThinking}
           />
@@ -175,7 +181,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             className={`
               absolute right-2 top-2 w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300
               ${inputText.trim() && !isThinking ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 scale-100' : 'bg-zinc-800/50 text-zinc-600 scale-95'}
-            `}
+            `} 
           >
             <Send size={18} />
           </button>
