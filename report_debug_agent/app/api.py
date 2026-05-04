@@ -20,6 +20,7 @@ from app.history_manager import history_manager
 
 # Global retriever initialized once at startup
 retriever = None
+current_filenames = []
 
 # Ensure uploads directory exists
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -30,11 +31,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Handles startup and shutdown events (modern FastAPI pattern)."""
-    global retriever
+    global retriever, current_filenames
     default_path = os.getenv("DEFAULT_DOC_PATH")
     if default_path and os.path.exists(default_path):
         try:
             retriever = setup_vector_store([default_path], overwrite=True)
+            current_filenames = [os.path.basename(default_path)]
             _ = retriever.invoke(" ")
             print(f"[API Startup] Loaded default document: {default_path}")
         except Exception as e:
@@ -80,6 +82,13 @@ async def upload_documents(files: list[UploadFile] = File(...), overwrite: str =
         # Initialize or update vector store with the uploaded files
         retriever = setup_vector_store(file_paths, overwrite=is_overwrite)
         _ = retriever.invoke(" ")
+
+        global current_filenames
+        if is_overwrite:
+            current_filenames = filenames
+        else:
+            # Merge while avoiding duplicates
+            current_filenames = list(set(current_filenames + filenames))
 
         return {
             "status": "ready",
@@ -134,7 +143,9 @@ async def ask_question(request: QuestionRequest):
 
     async def event_generator():
         try:
-            async for token in run_agent_stream(request.question, thread_id=request.thread_id):
+            # Pass the list of current filenames to the agent to set context
+            file_context = f"\n\n[SYSTEM INFO] Currently loaded documents: {', '.join(current_filenames)}"
+            async for token in run_agent_stream(request.question + file_context, thread_id=request.thread_id):
                 yield token
         except Exception as e:
             import traceback

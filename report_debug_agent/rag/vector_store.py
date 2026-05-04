@@ -51,7 +51,7 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     
     embeddings = OllamaEmbeddings(
         base_url="http://192.168.1.240:11434",
-        model="nomic-embed-text:latest"  # Updated to available embedding model
+        model="nomic-embed-text:latest"
     )
     
     print(f"Created {len(splits)} chunks. Initializing Ollama Embeddings ({embeddings.model}) and ChromaDB...")
@@ -62,9 +62,17 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
         try:
             shutil.rmtree(persist_dir)
             print(f"Cleared previous vector store at {persist_dir} to start fresh.")
-        except Exception:
-            # Silently continue if directory is locked; Chroma will handle existing data
-            pass
+        except Exception as e:
+            print(f"Warning: Could not clear directory (locked): {e}. Attempting to clear existing collection instead.")
+            try:
+                # Fallback: Initialize and delete all documents
+                v = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+                ids = v.get()['ids']
+                if ids:
+                    v.delete(ids=ids)
+                    print(f"Successfully cleared all documents from the existing collection.")
+            except Exception as inner_e:
+                print(f"Critical Warning: Failed to clear collection: {inner_e}")
 
     if not overwrite and os.path.exists(persist_dir):
         vectorstore = Chroma(

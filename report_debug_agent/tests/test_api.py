@@ -17,7 +17,7 @@ def test_api():
         print("Setup failed. Exiting.")
         return
 
-    # 2. Ask Question
+    # 2. Ask Question   
     print(f"\n--- Testing /ask ---")
     payload = {
         "question": "What is this project about?",
