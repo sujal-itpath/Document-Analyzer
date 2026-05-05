@@ -1,7 +1,7 @@
 import os
 import shutil
 from dotenv import load_dotenv
-from langchain_community.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader
+from langchain_community.document_loaders import TextLoader, PyPDFLoader, Docx2txtLoader, CSVLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
@@ -25,13 +25,15 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
             loader = PyPDFLoader(file_path)
         elif file_path.endswith('.docx'):
             loader = Docx2txtLoader(file_path)
+        elif file_path.endswith('.csv'):
+            loader = CSVLoader(file_path)
         else:
             loader = TextLoader(file_path, encoding='utf-8')
             
         docs = loader.load()
         if not docs:
             print(f"Warning: Failed to load any readable text from {file_path}.")
-            continue
+            continue    
         all_docs.extend(docs)
         
     if not all_docs:

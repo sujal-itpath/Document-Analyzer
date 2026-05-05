@@ -115,6 +115,8 @@ async def get_preview(filename: str):
         media_type = "application/pdf"
     elif filename.endswith(".txt"):
         media_type = "text/plain"
+    elif filename.endswith(".csv"):
+        media_type = "text/csv"
 
     return FileResponse(file_path, media_type=media_type)
 

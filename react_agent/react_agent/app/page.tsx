@@ -4,15 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { 
   Upload, FileText, Bot, Loader2, CheckCircle2, 
   AlertCircle, RefreshCcw, Files, LayoutGrid, 
-  ChevronRight, MessageSquare, ArrowLeft, Plus
+  ChevronRight, MessageSquare, ArrowLeft, Plus,
+  Sun, Moon, Sparkles, Wand2
 } from 'lucide-react';
 import ChatInterface from '../components/ChatInterface';
 import DocumentPreview from '../components/DocumentPreview';
 
-type AppMode = 'selection' | 'single' | 'multi';
+type AppMode = 'upload' | 'chat'    ;
 
 export default function Home() {
-  const [mode, setMode] = useState<AppMode>('selection');
+  const [mode, setMode] = useState<AppMode>('upload');
   const [isUploaded, setIsUploaded] = useState(false);
   const [files, setFiles] = useState<{ name: string; previewUrl?: string }[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -23,10 +24,28 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string>('');
   const [showPreview, setShowPreview] = useState(false);
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  const [suggestions, setSuggestions] = useState<{ id: string; label: string; icon?: React.ReactNode }[]>([]);
+
+  const defaultSuggestions = [
+    { id: 'summary', label: 'Summarize this', icon: <FileText size={14} /> },
+    { id: 'extract', label: 'Key data points', icon: <Wand2 size={14} /> },
+    { id: 'qa', label: 'Generate Q&A', icon: <MessageSquare size={14} /> },
+  ];
+  
+  useEffect(() => {
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);  
 
   // Initialize session on mount
   useEffect(() => {
     const savedSessionId = localStorage.getItem('last_session_id');
+    const savedTheme = localStorage.getItem('theme') as 'dark' | 'light';
+    
+    if (savedTheme) setTheme(savedTheme);
+    
     if (savedSessionId) {
       setSessionId(savedSessionId);
     } else {
@@ -35,6 +54,12 @@ export default function Home() {
       localStorage.setItem('last_session_id', newSessionId);
     }
   }, []);
+
+  const toggleTheme = () => { 
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
@@ -63,8 +88,8 @@ export default function Home() {
         throw new Error('Failed to upload document(s)');
       }
 
-      const data = await response.json();
       setIsUploaded(true);
+      setMode('chat');
       
       const uploadedFiles = fileList.map(f => ({ 
         name: f.name, 
@@ -73,18 +98,21 @@ export default function Home() {
       
       setFiles(uploadedFiles);
       
-      if (mode === 'single') {
-        setMessages([{ 
-          role: 'agent', 
-          content: `Hello! I've analyzed **${fileList[0].name}**. How can I help you with this document?` 
-        }]);
+      const fileCount = fileList.length;
+      const fileNames = fileList.map(f => f.name).join(', ');
+
+      setMessages([{ 
+        role: 'agent', 
+        content: fileCount === 1 
+          ? `Hello! I've analyzed **${fileNames}**. How can I help you with this document?`
+          : `I've successfully indexed **${fileCount} documents**: \n${fileList.map(f => `- ${f.name}`).join('\n')}\n\nYou can now ask me to compare them, summarize them, or find specific details across the set.`
+      }]);
+
+      setSuggestions(defaultSuggestions);
+
+      if (fileCount === 1) {
         setActivePreviewUrl(uploadedFiles[0].previewUrl);
         setShowPreview(true);
-      } else {
-        setMessages([{ 
-          role: 'agent', 
-          content: `I've successfully indexed **${fileList.length} documents**: \n${fileList.map(f => `- ${f.name}`).join('\n')}\n\nYou can now ask me to compare them, summarize them, or find specific details across the set.` 
-        }]);
       }
     } catch (err: any) {
       setError(err.message || 'An error occurred during upload');
@@ -93,11 +121,11 @@ export default function Home() {
     }
   };
 
-  const handleSendMessage = async (e?: React.FormEvent) => {
+  const handleSendMessage = async (e?: React.FormEvent, messageOverride?: string) => {
     e?.preventDefault();
-    if (!inputText.trim() || isThinking) return;
+    const userMessage = (messageOverride || inputText).trim();
+    if (!userMessage || isThinking) return;
 
-    const userMessage = inputText.trim();
     setInputText('');
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
     setIsThinking(true);
@@ -143,6 +171,32 @@ export default function Home() {
           }
         }
       }
+
+      // Parse suggestions from final response
+      const suggestionMatch = accumulatedResponse.match(/Suggestions:\s*(.*)$/m);
+      if (suggestionMatch) {
+        const suggestionText = suggestionMatch[1];
+        const suggestionList = suggestionText.split('|').map((s, i) => ({
+          id: `suggestion_${Date.now()}_${i}`,
+          label: s.trim(),
+          icon: <Sparkles size={14} />
+        })).filter(s => s.label);
+        
+        if (suggestionList.length > 0) {
+          setSuggestions(suggestionList);
+          // Clean up the message content to remove the "Suggestions: ..." line
+          setMessages((prev) => {
+            const newMessages = [...prev];
+            const lastMsg = newMessages[newMessages.length - 1];
+            if (lastMsg && lastMsg.role === 'agent') {
+              lastMsg.content = lastMsg.content.replace(/Suggestions:\s*.*$/, '').trim();
+            }
+            return newMessages;
+          });
+        }
+      } else {
+        setSuggestions(defaultSuggestions);
+      }
     } catch (err: any) {
       setError(err.message || 'An error occurred');
       setIsThinking(false);
@@ -160,145 +214,79 @@ export default function Home() {
     setFiles([]);
     setMessages([]);
     setError(null);
-    setMode('selection');
+    setMode('upload');
     setShowPreview(false);
     setActivePreviewUrl(null);
   };
 
   return (
-    <div className="flex h-screen bg-black text-white font-sans selection:bg-blue-500/30 overflow-hidden">
+    <div className="flex h-screen bg-background text-foreground font-sans selection:bg-accent/30 overflow-hidden transition-colors duration-300">
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* Header */}
-        <header className="flex items-center justify-between px-6 py-4 border-b border-white/5 glass z-20">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-border glass z-20">
           <div className="flex items-center gap-4">
             <button 
               onClick={resetState}
               className="flex items-center gap-3 hover:opacity-80 transition-opacity"
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20">
-                <Bot size={18} className="text-white" />
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <Bot size={22} className="text-white" />
               </div>
               <div>
-                <h1 className="text-sm font-bold tracking-tight">DocuMind AI</h1>
-                <p className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">Enterprise Intelligence</p>
+                <h1 className="text-base font-black tracking-tight">DocuMind AI</h1>
+                <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest">Intelligent Analysis</p>
               </div>
             </button>
-            
-            {mode !== 'selection' && (
-              <div className="h-6 w-[1px] bg-white/10 mx-2 hidden md:block"></div>
-            )}
-            
-            {mode !== 'selection' && (
-              <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-zinc-900 rounded-full border border-white/5">
-                {mode === 'single' ? <FileText size={12} className="text-blue-400" /> : <Files size={12} className="text-purple-400" />}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-                  {mode === 'single' ? 'Single Doc Mode' : 'Multi-Doc Analysis'}
-                </span>
-              </div>
-            )}
           </div>
 
-          <div className="flex items-center gap-4">
-            {isUploaded && mode === 'single' && (
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={toggleTheme}
+              className="p-2.5 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground transition-all"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            
+            {isUploaded && (
               <button 
                 onClick={() => setShowPreview(!showPreview)}
-                className={`p-2 rounded-lg transition-all ${showPreview ? 'bg-blue-600/10 text-blue-400' : 'text-zinc-500 hover:text-white'}`}
+                className={`p-2.5 rounded-xl transition-all ${showPreview ? 'bg-accent/10 text-accent' : 'text-muted-foreground hover:text-foreground'}`}
                 title="Toggle Preview"
               >
-                <FileText size={18} />
+                <FileText size={20} />
               </button>
             )}
+            
             <button 
               onClick={resetState}
-              className="p-2 hover:bg-white/5 rounded-lg text-zinc-500 hover:text-white transition-all group"
-              title="Reset to Home"
+              className="p-2.5 hover:bg-muted rounded-xl text-muted-foreground hover:text-foreground transition-all group"
+              title="New Session"
             >
-              <RefreshCcw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+              <RefreshCcw size={20} className="group-hover:rotate-180 transition-transform duration-500" />
             </button>
           </div>
         </header>
 
         <main className="flex-1 flex overflow-hidden relative">
           {/* Background Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-600/5 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-accent/5 blur-[120px] rounded-full -z-10 pointer-events-none"></div>
 
-          {mode === 'selection' ? (
-            /* Selection Stage */
-            <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in zoom-in-95 duration-500">
-              <div className="text-center mb-16">
-                <h2 className="text-5xl md:text-6xl font-black mb-6 leading-tight tracking-tighter">
-                  Choose your <br /> 
-                  <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent italic">Intelligence.</span>
-                </h2>
-                <p className="text-zinc-500 text-lg max-w-lg mx-auto font-medium">
-                  Select a specialized analysis tool to begin interacting with your data.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
-                {/* Single Doc Card */}
-                <button 
-                  onClick={() => {
-                    setMode('single');
-                    setError(null);
-                  }}
-                  className="group relative flex flex-col items-start p-8 bg-zinc-900/20 border border-white/5 rounded-[32px] hover:bg-zinc-900/40 hover:border-blue-500/30 transition-all duration-500 text-left"
-                >
-                  <div className="w-14 h-14 bg-blue-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
-                    <FileText className="text-blue-400" size={28} />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">Single Document Chat</h3>
-                  <p className="text-zinc-500 text-sm leading-relaxed mb-8">
-                    Deep dive into a single PDF or report. Ask questions, get summaries, and extract key data points instantly.
-                  </p>
-                  <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-blue-400 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-[-10px] group-hover:translate-x-0">
-                    Get Started <ChevronRight size={14} />
-                  </div>
-                </button>
-
-                {/* Multi Doc Card */}
-                <button 
-                  onClick={() => {
-                    setMode('multi');
-                    setError(null);
-                  }}
-                  className="group relative flex flex-col items-start p-8 bg-zinc-900/20 border border-white/5 rounded-[32px] hover:bg-zinc-900/40 hover:border-purple-500/30 transition-all duration-500 text-left"
-                >
-                  <div className="w-14 h-14 bg-purple-500/10 rounded-2xl flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500">
-                    <Files className="text-purple-400" size={28} />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">Multi-Doc Comparison</h3>
-                  <p className="text-zinc-500 text-sm leading-relaxed mb-8">
-                    Analyze multiple documents simultaneously. Compare versions, contrast policies, and find cross-document patterns.
-                  </p>
-                  <div className="mt-auto flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-purple-400 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-[-10px] group-hover:translate-x-0">
-                    Begin Analysis <ChevronRight size={14} />
-                  </div>
-                </button>
-              </div>
-            </div>
-          ) : !isUploaded ? (
+          {!isUploaded ? (
             /* Upload Stage */
-            <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in slide-in-from-bottom-4 duration-500">
-              <button 
-                onClick={() => {
-                  setMode('selection');
-                  setError(null);
-                }}
-                className="mb-12 flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-sm font-semibold"
-              >
-                <ArrowLeft size={16} /> Back to Tools
-              </button>
-
-              <div className="text-center mb-10">
-                <h2 className="text-3xl font-black mb-3">
-                  Upload {mode === 'single' ? 'your document' : 'multiple documents'}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+              <div className="text-center mb-12">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-accent/10 text-accent rounded-full text-[10px] font-bold uppercase tracking-widest mb-6">
+                  <Sparkles size={12} />
+                  Next-Gen Document Intelligence
+                </div>
+                <h2 className="text-5xl md:text-6xl font-black mb-6 tracking-tight leading-tight">
+                  Unlock the knowledge in <br />
+                  <span className="bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent italic">your documents.</span>
                 </h2>
-                <p className="text-zinc-500 text-sm font-medium">
-                  {mode === 'single' 
-                    ? 'Select a PDF, DOCX, or TXT file to begin analysis.' 
-                    : 'Select up to 10 files to compare and contrast simultaneously.'}
+                <p className="text-muted-foreground text-lg max-w-xl mx-auto font-medium">
+                  Upload one or more files and let our agent analyze, compare, and extract insights instantly.
                 </p>
               </div>
 
@@ -307,32 +295,33 @@ export default function Home() {
                   type="file" 
                   className="hidden" 
                   onChange={handleFileUpload} 
-                  accept=".pdf,.docx,.txt"
-                  multiple={mode === 'multi'}
+                  accept=".pdf,.docx,.txt,.csv"
+                  multiple
                   disabled={isUploading}
                 />
                 <div className={`
-                  w-64 h-64 rounded-[40px] border border-white/10
+                  w-72 h-72 rounded-[48px] border-2 border-dashed
                   transition-all duration-500 flex flex-col items-center justify-center gap-6
-                  shadow-2xl shadow-black
-                  ${isUploading ? 'bg-blue-600/5 border-blue-500/20' : 'bg-zinc-900/20 hover:bg-zinc-900/40 hover:border-white/20'}
+                  ${isUploading 
+                    ? 'bg-accent/5 border-accent animate-pulse' 
+                    : 'bg-card border-border hover:border-accent hover:bg-muted/50 shadow-2xl shadow-black/5'}
                 `}>
                   {isUploading ? (
-                    <>
-                      <Loader2 size={48} className="text-blue-500 animate-spin" />
+                    <>                        
+                      <Loader2 size={48} className="text-accent animate-spin" />
                       <div className="text-center px-6">
-                        <p className="text-base font-bold text-white mb-1">Indexing...</p>
-                        <p className="text-xs text-zinc-500 font-medium">Building knowledge graph</p>
+                        <p className="text-base font-bold mb-1">Processing...</p>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Building Knowledge Graph</p>
                       </div>
                     </>
                   ) : (
                     <> 
-                      <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${mode === 'single' ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'}`}>
-                        <Upload size={28} />
+                      <div className="w-20 h-20 rounded-3xl bg-accent/10 text-accent flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
+                        <Upload size={32} />
                       </div>
                       <div className="text-center px-6">
-                        <p className="text-sm font-bold text-white mb-1">Click to select</p>
-                        <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-widest">PDF, DOCX, TXT</p>
+                        <p className="text-lg font-bold mb-1">Drop documents here</p>
+                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest">PDF, DOCX, TXT, CSV</p>
                       </div>
                     </>
                   )}
@@ -340,11 +329,24 @@ export default function Home() {
               </label>
 
               {error && (
-                <div className="mt-8 flex items-center gap-3 text-red-400 bg-red-400/5 px-6 py-3 rounded-2xl border border-red-400/10">
-                  <AlertCircle size={18} />
-                  <span className="text-sm font-semibold">{error}</span>
+                <div className="mt-8 flex items-center gap-3 text-red-500 bg-red-500/5 px-6 py-4 rounded-2xl border border-red-500/10 animate-in fade-in zoom-in-95">
+                  <AlertCircle size={20} />
+                  <span className="text-sm font-bold">{error}</span>
                 </div>
               )}
+
+              <div className="mt-16 grid grid-cols-3 gap-8 text-center max-w-2xl">
+                {[
+                  { label: 'Instant Summaries', icon: <FileText size={18} /> },
+                  { label: 'Cross-Doc Analysis', icon: <Files size={18} /> },
+                  { label: 'Deep Search', icon: <Bot size={18} /> },
+                ].map((feat, i) => (
+                  <div key={i} className="flex flex-col items-center gap-3">
+                    <div className="text-muted-foreground/40">{feat.icon}</div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">{feat.label}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             /* Chat Stage */
@@ -354,9 +356,10 @@ export default function Home() {
                 inputText={inputText}
                 setInputText={setInputText}
                 isThinking={isThinking}
-                onSendMessage={handleSendMessage}
+                onSendMessage={(e, msg) => handleSendMessage(e, msg)}
                 onClearChat={() => setMessages([])}
-                mode={mode === 'multi' ? 'multi' : 'single'}
+                mode={files.length > 1 ? 'multi' : 'single'}
+                quickPrompts={suggestions}
               />
               {showPreview && activePreviewUrl && (
                 <DocumentPreview 
