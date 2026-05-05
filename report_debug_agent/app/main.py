@@ -1,56 +1,35 @@
 import os
 import sys
 
+# Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rag.vector_store import setup_vector_store
-from agent.agent import run_agent
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.api.router import api_router
 
-import asyncio
+app = FastAPI(
+    title=settings.PROJECT_NAME,
+    version=settings.PROJECT_VERSION,
+)
 
-async def main():
-    print("="*50)
-    print("Welcome to the Document Analysis Agent!")
-    print("="*50)
-    
-    file_path = input("\nEnter the path to the document you want to analyze (e.g., sample.pdf, report.docx, notes.txt):\n> ")
-    if not os.path.exists(file_path):
-        print(f"Error: File '{file_path}' not found.")
-        return
-        
-    print(f"\n[System] Setting up the knowledge base with {os.path.basename(file_path)}. This might take a moment...")
-    try:
-        retriever = setup_vector_store([file_path])
-        docs = retriever.invoke(" ")
-        if docs:
-            print(f"\n[System Verification] Successfully indexed document.")
-    except Exception as e:
-        print(f"Error setting up vector store: {e}")
-        return
+# Enable CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-        
-    print("\n[System] Ready! You can now ask questions about the document or ask for suggestions.")
-    print("Type 'exit' or 'quit' to end the session.\n")    
-    
-    thread_id = "session_1"
-    
-    while True:
-        user_input = input("You: ")
-        
-        if user_input.lower() in ['exit', 'quit']:
-            print("Session ended. Goodbye!")
-            break   
-            
-        if not user_input.strip():
-            continue
-                
-        print("Agent thinking...")
-        try:
-            response = await run_agent(user_input, thread_id=thread_id)
-            print(f"\nAgent:\n{response}\n")
-            print("-" * 50)
-        except Exception as e:
-            print(f"An error occurred during agent execution: {e}")
+# Include API Router
+app.include_router(api_router)
+
+@app.get("/")
+async def root():
+    return {"message": "Document Analysis Agent API is running"}
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

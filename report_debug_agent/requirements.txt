@@ -15,3 +15,9 @@ python-multipart
 langchain-ollama
 aiosqlite
 langchain-groq
+unstructured[all-docs]
+pdfplumber
+pytesseract
+networkx
+scikit-learn
+pydantic-settings
