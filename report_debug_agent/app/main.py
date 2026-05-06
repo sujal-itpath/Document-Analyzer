@@ -9,10 +9,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.router import api_router
 
+from app.db.database import init_db
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.PROJECT_VERSION,
 )
+
+# Initialize database
+init_db()
 
 # Enable CORS
 app.add_middleware(

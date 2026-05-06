@@ -1,18 +1,27 @@
 import os
 import shutil
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
+from sqlalchemy.orm import Session
 from app.core.config import settings
+from app.db.database import get_db, Document as DBDocument, User
+from app.api.endpoints.auth import get_current_user
 from rag.vector_store import setup_vector_store
+from app.services.document_processor import DocumentProcessor
+from app.services.analyzer import DocumentAnalyzer
 
 router = APIRouter()
-
-# Store current filenames in a simple state (could be moved to a more robust state manager)
-current_filenames = []
+analyzer = DocumentAnalyzer()
+processor = DocumentProcessor()
 
 @router.post("/upload")
-async def upload_documents(files: list[UploadFile] = File(...), overwrite: str = Form("true")):
+async def upload_documents(
+    background_tasks: BackgroundTasks,
+    files: list[UploadFile] = File(...), 
+    overwrite: str = Form("true"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
     """Upload one or more documents, save them locally, and update the vector store."""
-    global current_filenames
     is_overwrite = overwrite.lower() == "true"
     
     try:
@@ -22,16 +31,31 @@ async def upload_documents(files: list[UploadFile] = File(...), overwrite: str =
             file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
+            
+            # Save to DB
+            db_doc = DBDocument(
+                filename=file.filename,
+                file_path=file_path,
+                owner_id=current_user.id
+            )
+            db.add(db_doc)
             file_paths.append(file_path)
             filenames.append(file.filename)
+            db.flush() # Get the ID for the document
+            
+            # Extract text for analysis
+            try:
+                extracted_docs = processor.process_document(file_path)
+                if extracted_docs:
+                    full_text = "\n".join([d.page_content for d in extracted_docs])
+                    background_tasks.add_task(analyzer.analyze, db_doc.id, full_text)
+            except Exception as e:
+                print(f"Failed to start analysis for {file.filename}: {e}")
+
+        db.commit()
 
         # Initialize or update vector store with the uploaded files
         setup_vector_store(file_paths, overwrite=is_overwrite)
-
-        if is_overwrite:
-            current_filenames = filenames
-        else:
-            current_filenames = list(set(current_filenames + filenames))
 
         return {
             "status": "ready",
@@ -40,7 +64,14 @@ async def upload_documents(files: list[UploadFile] = File(...), overwrite: str =
             "overwrite": is_overwrite
         }
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
-def get_current_filenames():
-    return current_filenames
+@router.get("/documents")
+async def get_user_documents(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List all documents uploaded by the current user."""
+    docs = db.query(DBDocument).filter(DBDocument.owner_id == current_user.id).all()
+    return [{"id": d.id, "filename": d.filename, "upload_date": d.upload_date} for d in docs]

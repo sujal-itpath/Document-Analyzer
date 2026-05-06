@@ -49,6 +49,8 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
         chunk_id = f"chunk_{i}"
         knowledge_graph.add_entities_from_text(split.page_content, split.metadata.get("source", "unknown"), chunk_id)
     knowledge_graph.save()
+    
+    embeddings = OllamaEmbeddings(
         base_url="http://192.168.1.240:11434",
         model="nomic-embed-text:latest"
     )

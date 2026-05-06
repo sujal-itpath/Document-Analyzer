@@ -16,6 +16,7 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)

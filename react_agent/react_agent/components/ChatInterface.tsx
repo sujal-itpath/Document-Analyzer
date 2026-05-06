@@ -1,11 +1,18 @@
-import React, { useRef, useEffect } from 'react';
-import { Send, User, Bot, Loader2, Copy, Check, Trash2 } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { Send, User, Bot, Loader2, Copy, Check, Trash2, FileText, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface Message {
   role: 'user' | 'agent';
   content: string;
+}
+
+interface Document {
+  id: number;
+  filename: string;
+  summary?: string;
+  suggestions?: string;
 }
 
 interface ChatInterfaceProps {
@@ -16,7 +23,8 @@ interface ChatInterfaceProps {
   onSendMessage: (e?: React.FormEvent, message?: string) => void;
   onClearChat: () => void;
   mode: 'single' | 'multi';
-  quickPrompts?: { id: string; label: string; icon: React.ReactNode }[];
+  availableDocuments: Document[];
+  onDocumentSelect: (doc: Document) => void;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -27,9 +35,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage,
   onClearChat,
   mode,
-  quickPrompts
+  availableDocuments,
+  onDocumentSelect
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [showMentions, setShowMentions] = useState(false);
+  const [mentionFilter, setMentionFilter] = useState('');
+  const [quickPrompts, setQuickPrompts] = useState<{label: string, icon: any}[]>([]);
+
+  useEffect(() => {
+    // Generate dynamic suggestions from documents
+    const allSuggestions: string[] = [];
+    availableDocuments.forEach(doc => {
+      if (doc.suggestions) {
+        try {
+          const suggestionsList = JSON.parse(doc.suggestions);
+          if (Array.isArray(suggestionsList)) {
+            allSuggestions.push(...suggestionsList);
+          }
+        } catch (e) {}
+      }
+    });
+    
+    setQuickPrompts(allSuggestions.slice(0, 4).map((s, i) => ({
+      label: s,
+      icon: <Sparkles size={12} />
+    })));
+  }, [availableDocuments]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -39,9 +71,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     scrollToBottom();
   }, [messages, isThinking]);
 
-  const handleQuickPromptClick = (label: string) => {
-    onSendMessage(undefined, label);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setInputText(value);
+
+    const lastChar = value[value.length - 1];
+    const mentionMatch = value.match(/@(\w*)$/);
+    
+    if (mentionMatch) {
+      setShowMentions(true);
+      setMentionFilter(mentionMatch[1].toLowerCase());
+    } else {
+      setShowMentions(false);
+    }
   };
+
+  const insertMention = (doc: Document) => {
+    const newValue = inputText.replace(/@(\w*)$/, `@${doc.filename} `);
+    setInputText(newValue);
+    setShowMentions(false);
+    onDocumentSelect(doc);
+  };
+
+  const filteredDocs = availableDocuments.filter(doc => 
+    doc.filename.toLowerCase().includes(mentionFilter)
+  );
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden transition-colors duration-300">
@@ -59,6 +113,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 {mode === 'single' 
                   ? "I've analyzed your document. You can ask me to summarize it, find specific details, or explain complex sections."
                   : "I've indexed your documents. You can ask me to compare them, find contradictions, or summarize key differences."}
+                <br/>
+                <span className="text-xs font-bold mt-4 block opacity-60">Try typing @ to mention a document</span>
               </p>
           </div>
         ) : ( 
@@ -172,13 +228,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Input Area */}
       <div className="p-4 md:p-8 bg-background/80 border-t border-border backdrop-blur-xl relative z-10">
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
+          {/* Mentions Dropdown */}
+          {showMentions && filteredDocs.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-2 w-64 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom-2">
+              <div className="p-3 bg-muted/50 border-b border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground">Mention Document</div>
+              <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                {filteredDocs.map(doc => (
+                  <button
+                    key={doc.id}
+                    onClick={() => insertMention(doc)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold hover:bg-accent hover:text-white transition-colors"
+                  >
+                    <FileText size={16} />
+                    <span className="truncate">{doc.filename}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Quick Prompts */}
           {!isThinking && quickPrompts && quickPrompts.length > 0 && (
             <div className="flex flex-wrap gap-2.5 animate-in slide-in-from-bottom-2 duration-500">
-              {quickPrompts.map((p) => (
+              {quickPrompts.map((p, i) => (
                 <button
-                  key={p.id}
-                  onClick={() => handleQuickPromptClick(p.label)}
+                  key={i}
+                  onClick={() => onSendMessage(undefined, p.label)}
                   className="flex items-center gap-2.5 px-4 py-2 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-2xl text-xs font-bold transition-all hover:-translate-y-1 hover:shadow-lg active:translate-y-0 group/btn shadow-sm"
                 >
                   <span className="text-accent group-hover/btn:scale-110 transition-transform">{p.icon}</span>
@@ -193,8 +268,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             <input
               type="text"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder="Ask anything about your documents..."
+              onChange={handleInputChange}
+              placeholder="Ask anything about your documents... (Type @ to mention)"
               className="relative w-full bg-card border border-border rounded-[22px] py-5 pl-8 pr-16 focus:outline-none focus:border-accent transition-all placeholder:text-muted-foreground/50 text-base shadow-2xl shadow-black/5"
               disabled={isThinking}
             />
