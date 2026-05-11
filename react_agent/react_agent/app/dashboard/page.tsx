@@ -12,15 +12,32 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<'home' | 'chat'>('home');
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const { isAuthenticated, user, token: authToken } = useAuth();
+  const { isAuthenticated, user, token: authToken, loading } = useAuth();
   const router = useRouter();
 
   // Protect the route
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated && !loading) {
       router.push('/login');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, loading, router]);
+
+  // Load session from localStorage on mount
+  useEffect(() => {
+    const savedSessionId = localStorage.getItem('current_session_id');
+    if (savedSessionId && !currentSessionId) {
+      handleSessionSelect(savedSessionId);
+    }
+  }, []);
+
+  // Persist session to localStorage
+  useEffect(() => {
+    if (currentSessionId) {
+      localStorage.setItem('current_session_id', currentSessionId);
+    } else {
+      localStorage.removeItem('current_session_id');
+    }
+  }, [currentSessionId]);
 
   const [selectedDocs, setSelectedDocs] = useState<any[]>([]);
   const [messages, setMessages] = useState<any[]>([]);
@@ -51,6 +68,7 @@ export default function Dashboard() {
 
   const handleNewChat = () => {
     setCurrentSessionId(undefined);
+    localStorage.removeItem('current_session_id');
     setMessages([]);
     setActiveView('chat');
   };
@@ -173,6 +191,9 @@ export default function Dashboard() {
               onSelectDocuments={handleSelectDocs}
               onOpenChat={(docs) => {
                 setSelectedDocs(docs);
+                setCurrentSessionId(undefined); // Start fresh
+                localStorage.removeItem('current_session_id');
+                setMessages([]);
                 setActiveView('chat');
               }}
             />

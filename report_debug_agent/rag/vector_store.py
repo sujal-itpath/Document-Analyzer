@@ -79,4 +79,23 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     return _retriever
 
 def get_retriever():
-    return _retriever
+    global _retriever
+    if _retriever is not None:
+        return _retriever
+        
+    # Try to load from disk if _retriever is None (e.g. after restart)
+    persist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
+    if os.path.exists(persist_dir):
+        try:
+            embeddings = OllamaEmbeddings(
+                base_url="http://192.168.1.240:11434",
+                model="nomic-embed-text:latest"
+            )
+            vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+            _retriever = vectorstore.as_retriever(search_kwargs={"k": 7})
+            print("Vector store auto-initialized from disk.")
+            return _retriever
+        except Exception as e:
+            print(f"Failed to auto-initialize vector store: {e}")
+            
+    return None
