@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import create_engine
 import datetime
 import os
+from sqlalchemy import inspect
 
 DATABASE_URL = "sqlite:///./app_v2.db"
 
@@ -41,6 +42,7 @@ class ChatSession(Base):
     id = Column(String, primary_key=True) # UUID or string ID
     title = Column(String, default="New Chat")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    document_ids = Column(String, nullable=False, default="[]")
     user_id = Column(Integer, ForeignKey("users.id"))
     
     user = relationship("User", back_populates="sessions")
@@ -58,6 +60,14 @@ class Message(Base):
 
 def init_db():
     Base.metadata.create_all(bind=engine)
+    _ensure_chat_session_columns()
+
+def _ensure_chat_session_columns():
+    inspector = inspect(engine)
+    columns = {column["name"] for column in inspector.get_columns("chat_sessions")}
+    if "document_ids" not in columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN document_ids VARCHAR NOT NULL DEFAULT '[]'"))
 
 def get_db():
     db = SessionLocal()

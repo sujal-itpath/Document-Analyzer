@@ -1,36 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../../components/Sidebar';
 import HomeView from '../../components/HomeView';
 import ChatInterface from '../../components/ChatInterface';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { Loader2, MessageSquare } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
+
+type ViewType = 'home' | 'doc-select' | 'chat';
+type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string };
+type MessageItem = { role: 'user' | 'agent'; content: string };
+type SessionMessagesResponse = {
+  messages: Array<{ role: 'user' | 'agent'; content: string; timestamp: string }>;
+  document_ids: number[];
+  documents: DocumentItem[];
+};
+type UploadResponse = {
+  filenames: string[];
+};
+type SidebarSession = {
+  id: string;
+  title: string;
+  created_at: string;
+};
 
 export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeView, setActiveView] = useState<'home' | 'chat'>('home');
+  const [activeView, setActiveView] = useState<ViewType>('home');
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const { isAuthenticated, user, token: authToken, loading } = useAuth();
+  const { isAuthenticated, token: authToken, loading, logout } = useAuth();
   const router = useRouter();
 
-  // Protect the route
+  const [selectedDocs, setSelectedDocs] = useState<DocumentItem[]>([]);
+  const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [allDocs, setAllDocs] = useState<DocumentItem[]>([]);
+  const [sidebarSessions, setSidebarSessions] = useState<SidebarSession[]>([]);
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const [draftSessionTitle, setDraftSessionTitle] = useState<string | null>(null);
+  const [optimisticSession, setOptimisticSession] = useState<SidebarSession | null>(null);
+  const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
+  const currentSessionIdRef = useRef<string | undefined>(undefined);
+
   useEffect(() => {
-    if (!isAuthenticated && !loading) {
-      router.push('/login');
+    if (!loading && !isAuthenticated) {
+      router.push('/');
     }
   }, [isAuthenticated, loading, router]);
 
-  // Load session from localStorage on mount
-  useEffect(() => {
-    const savedSessionId = localStorage.getItem('current_session_id');
-    if (savedSessionId && !currentSessionId) {
-      handleSessionSelect(savedSessionId);
-    }
-  }, []);
-
-  // Persist session to localStorage
   useEffect(() => {
     if (currentSessionId) {
       localStorage.setItem('current_session_id', currentSessionId);
@@ -39,26 +58,108 @@ export default function Dashboard() {
     }
   }, [currentSessionId]);
 
-  const [selectedDocs, setSelectedDocs] = useState<any[]>([]);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [isThinking, setIsThinking] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
+  const fetchAllDocs = async (): Promise<DocumentItem[]> => {
+    if (!authToken) return [];
+    try {
+      const res = await fetch('http://localhost:8000/documents', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.status === 401) {
+        logout();
+        return [];
+      }
+      if (!res.ok) return [];
+      const docs: DocumentItem[] = await res.json();
+      setAllDocs(docs);
+      return docs;
+    } catch (err) {
+      console.error('Failed to fetch documents', err);
+      return [];
+    }
+  };
+
+  const fetchSidebarSessions = async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch('http://localhost:8000/sessions', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      if (!res.ok) return;
+      const sessions: SidebarSession[] = await res.json();
+      setSidebarSessions(sessions);
+    } catch (err) {
+      console.error('Failed to fetch sessions', err);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAllDocs();
+    void fetchSidebarSessions();
+  }, [authToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleNewChat = () => {
+    setCurrentSessionId(undefined);
+    setDraftSessionId(null);
+    setDraftSessionTitle(null);
+    setOptimisticSession(null);
+    localStorage.removeItem('current_session_id');
+    setMessages([]);
+    setSelectedDocs([]);
+    setInputText('');
+    setActiveView('doc-select');
+  };
+
+  const handleOpenChat = (docs: DocumentItem[]) => {
+    setSelectedDocs(docs);
+    setMessages([]);
+    setInputText('');
+    setCurrentSessionId(undefined);
+    setDraftSessionId(`draft-${Date.now()}`);
+    setDraftSessionTitle(
+      docs.length === 1
+        ? docs[0].filename
+        : `${docs[0]?.filename ?? 'New chat'} +${Math.max(docs.length - 1, 0)}`
+    );
+    setOptimisticSession(null);
+    localStorage.removeItem('current_session_id');
+    setActiveView('chat');
+  };
 
   const handleSessionSelect = async (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    setActiveView('chat');
+    if (!authToken) return;
     setIsThinking(true);
-    setMessages([]);
-
     try {
-      const response = await fetch(`http://localhost:8000/sessions/${sessionId}/messages`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
+      const res = await fetch(`http://localhost:8000/sessions/${sessionId}/messages`, {
+        headers: { Authorization: `Bearer ${authToken}` },
       });
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(data.map((m: any) => ({ role: m.role, content: m.content })));
+      if (res.status === 401) {
+        logout();
+        return;
       }
+      if (!res.ok) {
+        throw new Error('Failed to fetch session');
+      }
+
+      const data: SessionMessagesResponse = await res.json();
+      setCurrentSessionId(sessionId);
+      currentSessionIdRef.current = sessionId;
+      setDraftSessionId(null);
+      setDraftSessionTitle(null);
+      if (optimisticSession?.id === sessionId) {
+        setOptimisticSession(null);
+      }
+      setMessages(data.messages.map(message => ({ role: message.role, content: message.content })));
+      setSelectedDocs(data.documents);
+      setInputText('');
+      setActiveView('chat');
     } catch (err) {
       console.error('Failed to fetch messages', err);
     } finally {
@@ -66,47 +167,79 @@ export default function Dashboard() {
     }
   };
 
-  const handleNewChat = () => {
-    setCurrentSessionId(undefined);
-    localStorage.removeItem('current_session_id');
-    setMessages([]);
-    setActiveView('chat');
+  useEffect(() => {
+    const savedSessionId = localStorage.getItem('current_session_id');
+    if (!authToken || loading || currentSessionId) {
+      return;
+    }
+    if (savedSessionId) {
+      void handleSessionSelect(savedSessionId);
+    }
+  }, [authToken, loading, currentSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const persistSessionDocuments = async (sessionId: string, docs: DocumentItem[]) => {
+    if (!authToken) return;
+    const uniqueIds = Array.from(new Set(docs.map(doc => doc.id)));
+    const res = await fetch(`http://localhost:8000/sessions/${sessionId}/documents`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({ document_ids: uniqueIds }),
+    });
+    if (res.status === 401) {
+      logout();
+    }
   };
 
-  const [allDocs, setAllDocs] = useState<any[]>([]);
-  const fetchAllDocs = async () => {
-    if (authToken) {
-      try {
-        const response = await fetch('http://localhost:8000/documents', {
-          headers: { 'Authorization': `Bearer ${authToken}` }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setAllDocs(data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch documents', err);
+  const handleUploadDocuments = async (files: FileList) => {
+    if (!authToken || files.length === 0) return;
+
+    setIsUploadingDocuments(true);
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+    formData.append('overwrite', 'false');
+
+    try {
+      const res = await fetch('http://localhost:8000/upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${authToken}` },
+        body: formData,
+      });
+
+      if (res.status === 401) {
+        logout();
+        return;
       }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail || 'Upload failed');
+      }
+
+      const uploadData: UploadResponse = await res.json();
+      const latestDocs = await fetchAllDocs();
+      const uploadedDocs = latestDocs.filter(doc => uploadData.filenames.includes(doc.filename));
+      if (uploadedDocs.length === 0) return;
+
+      setSelectedDocs(prev => {
+        const existingIds = new Set(prev.map(doc => doc.id));
+        const merged = [...prev, ...uploadedDocs.filter(doc => !existingIds.has(doc.id))];
+        if (currentSessionIdRef.current) {
+          void persistSessionDocuments(currentSessionIdRef.current, merged);
+        }
+        return merged;
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed';
+      alert(message);
+    } finally {
+      setIsUploadingDocuments(false);
     }
   };
-
-  useEffect(() => {
-    fetchAllDocs();
-  }, [authToken]);
-
-  useEffect(() => {
-    if (activeView === 'chat') {
-      fetchAllDocs();
-    }
-  }, [activeView]);
-
-  if (!isAuthenticated) {
-    return (
-      <div className="h-screen flex items-center justify-center">
-        <Loader2 className="animate-spin text-accent" size={48} />
-      </div>
-    );
-  }
 
   const handleSendMessage = async (e?: React.FormEvent, messageOverride?: string) => {
     e?.preventDefault();
@@ -114,63 +247,90 @@ export default function Dashboard() {
     if (!userMessage || isThinking) return;
 
     setInputText('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsThinking(true);
 
+    const requestSessionId = currentSessionIdRef.current;
+    const requestDocumentIds = selectedDocs.map(doc => doc.id);
+
     try {
-      const response = await fetch('http://localhost:8000/ask', {
+      const res = await fetch('http://localhost:8000/ask', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          Authorization: `Bearer ${authToken}`,
         },
         body: JSON.stringify({
           question: userMessage,
-          thread_id: currentSessionId
+          thread_id: requestSessionId,
+          document_ids: requestSessionId ? [] : requestDocumentIds,
         }),
       });
 
-      if (!response.ok) throw new Error('Failed to get response');
-
-      // Update Session ID if it's a new chat
-      const returnedSessionId = response.headers.get('X-Session-ID');
-      if (returnedSessionId && !currentSessionId) {
-        setCurrentSessionId(returnedSessionId);
+      if (res.status === 401) {
+        logout();
+        return;
       }
 
-      const reader = response.body?.getReader();
+      if (!res.ok) throw new Error('Failed to get response');
+
+      const returnedSessionId = res.headers.get('X-Session-ID');
+      if (returnedSessionId && !requestSessionId) {
+        setCurrentSessionId(returnedSessionId);
+        currentSessionIdRef.current = returnedSessionId;
+        setDraftSessionId(null);
+        setDraftSessionTitle(null);
+        const createdSession = {
+          id: returnedSessionId,
+          title: userMessage.length > 30 ? `${userMessage.slice(0, 30)}...` : userMessage,
+          created_at: new Date().toISOString(),
+        };
+        setOptimisticSession(createdSession);
+        setSidebarSessions(prev => {
+          if (prev.some(session => session.id === returnedSessionId)) {
+            return prev;
+          }
+          return [createdSession, ...prev];
+        });
+        void fetchSidebarSessions();
+      }
+
+      const reader = res.body?.getReader();
       const decoder = new TextDecoder();
-      let accumulatedResponse = '';
-      let hasStartedStreaming = false;
+      let accumulated = '';
+      let started = false;
 
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          accumulatedResponse += chunk;
-          if (!hasStartedStreaming && accumulatedResponse.length > 0) {
-            hasStartedStreaming = true;
+          accumulated += decoder.decode(value, { stream: true });
+          if (!started && accumulated.length > 0) {
+            started = true;
             setIsThinking(false);
-            setMessages((prev) => [...prev, { role: 'agent', content: accumulatedResponse }]);
-          } else if (hasStartedStreaming) {
-            setMessages((prev) => {
-              const newMessages = [...prev];
-              newMessages[newMessages.length - 1] = { role: 'agent', content: accumulatedResponse };
-              return newMessages;
+            setMessages(prev => [...prev, { role: 'agent', content: accumulated }]);
+          } else if (started) {
+            setMessages(prev => {
+              const next = [...prev];
+              next[next.length - 1] = { role: 'agent', content: accumulated };
+              return next;
             });
           }
         }
       }
-    } catch (err) {
+    } catch {
       setIsThinking(false);
-      setMessages((prev) => [...prev, { role: 'agent', content: 'Error occurred.' }]);
+      setMessages(prev => [...prev, { role: 'agent', content: 'Something went wrong. Please try again.' }]);
     }
   };
 
-  const handleSelectDocs = (docs: any[]) => {
-    setSelectedDocs(docs);
-  };
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-accent" size={40} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-background text-foreground overflow-hidden">
@@ -178,61 +338,110 @@ export default function Dashboard() {
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         activeView={activeView}
-        setActiveView={setActiveView}
+        setActiveView={(view) => {
+          if (view === 'home') {
+            setActiveView('home');
+          } else if (view === 'doc-select') {
+            handleNewChat();
+          } else {
+            setActiveView('chat');
+          }
+        }}
         currentSessionId={currentSessionId}
+        sessions={sidebarSessions}
+        draftSessionId={draftSessionId}
+        draftSessionTitle={draftSessionTitle}
+        optimisticSession={optimisticSession}
         onSessionSelect={handleSessionSelect}
         onNewChat={handleNewChat}
       />
 
-      <main className="flex-1 relative overflow-hidden flex flex-col">
-        {activeView === 'home' ? (
-          <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-hidden flex flex-col min-w-0">
+        {activeView === 'home' && (
+          <div className="flex-1 overflow-hidden">
             <HomeView
-              onSelectDocuments={handleSelectDocs}
-              onOpenChat={(docs) => {
-                setSelectedDocs(docs);
-                setCurrentSessionId(undefined); // Start fresh
-                localStorage.removeItem('current_session_id');
-                setMessages([]);
-                setActiveView('chat');
-              }}
+              mode="manage"
+              onSelectDocuments={setSelectedDocs}
+              onOpenChat={handleOpenChat}
             />
           </div>
-        ) : (
-          <div className="flex-1 flex flex-col overflow-hidden">
-            {selectedDocs.length > 0 || currentSessionId ? (
-              <ChatInterface
-                messages={messages}
-                inputText={inputText}
-                setInputText={setInputText}
-                isThinking={isThinking}
-                onSendMessage={handleSendMessage}
-                onClearChat={() => setMessages([])}
-                mode={selectedDocs.length > 1 ? 'multi' : 'single'}
-                availableDocuments={allDocs}
-                onDocumentSelect={(doc) => {
-                  if (!selectedDocs.find(d => d.id === doc.id)) {
-                    setSelectedDocs([...selectedDocs, doc]);
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                <div className="w-20 h-20 bg-accent/10 rounded-3xl flex items-center justify-center mb-6 text-accent">
-                  <MessageSquare size={40} />
-                </div>
-                <h2 className="text-3xl font-black mb-4 tracking-tight">Ready to Chat?</h2>
-                <p className="text-muted-foreground text-lg max-w-md mx-auto mb-8">
-                  Go to the <strong>Documents</strong> section and select at least one file to start a conversation with the AI.
+        )}
+
+        {activeView === 'doc-select' && (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-card/50 flex-shrink-0">
+              <button
+                onClick={() => setActiveView('home')}
+                className="p-2 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-black text-lg">New Chat - Select Documents</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Choose one or more documents to include in this conversation
                 </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <HomeView
+                mode="select"
+                onSelectDocuments={setSelectedDocs}
+                onOpenChat={handleOpenChat}
+              />
+            </div>
+          </div>
+        )}
+
+        {activeView === 'chat' && (
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {selectedDocs.length > 0 && (
+              <div className="px-6 py-2.5 border-b border-border bg-card/40 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">
+                  Context
+                </span>
+                {selectedDocs.map(doc => (
+                  <span
+                    key={doc.id}
+                    className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 text-accent px-2.5 py-1 rounded-xl text-[11px] font-bold"
+                  >
+                    {doc.filename}
+                  </span>
+                ))}
                 <button
-                  onClick={() => setActiveView('home')}
-                  className="bg-accent text-white px-8 py-4 rounded-2xl font-black shadow-xl shadow-accent/20 hover:scale-105 active:scale-95 transition-all"
+                  onClick={handleNewChat}
+                  className="ml-auto text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
                 >
-                  Select Documents
+                  Change docs
                 </button>
               </div>
             )}
+
+            <ChatInterface
+              messages={messages}
+              inputText={inputText}
+              setInputText={setInputText}
+              isThinking={isThinking}
+              onSendMessage={handleSendMessage}
+              onClearChat={() => setMessages([])}
+              mode={selectedDocs.length > 1 ? 'multi' : 'single'}
+              availableDocuments={allDocs}
+              selectedDocs={selectedDocs}
+              onUploadDocuments={handleUploadDocuments}
+              isUploadingDocuments={isUploadingDocuments}
+              onDocumentSelect={(doc) => {
+                setSelectedDocs(prev => {
+                  if (prev.find(existing => existing.id === doc.id)) {
+                    return prev;
+                  }
+                  const merged = [...prev, doc];
+                  if (currentSessionIdRef.current) {
+                    void persistSessionDocuments(currentSessionIdRef.current, merged);
+                  }
+                  return merged;
+                });
+              }}
+            />
           </div>
         )}
       </main>

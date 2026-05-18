@@ -10,13 +10,13 @@ class DocumentAnalyzer:
         """Perform one-time analysis of a document to generate summary and suggestions."""
         prompt = f"""
         Analyze the following text and provide:
-        1. A concise summary (max 3 sentences).
+        1. A useful summary in 4-6 sentences covering purpose, major findings, and important details.
         2. Three suggested questions that a user might ask about this document.
         
         Format your response as a JSON object with keys "summary" and "suggestions" (a list of strings).
         
         Text:
-        {text[:4000]}  # Analyze first 4000 characters for speed
+        {text[:25000]}
         """
         
         try:

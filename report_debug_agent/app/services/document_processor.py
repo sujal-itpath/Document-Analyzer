@@ -7,7 +7,7 @@ from typing import List
 class DocumentProcessor:
     @staticmethod
     def process_document(file_path: str) -> List[Document]:
-        """
+        """ 
         Process a document using OCR and table extraction.
         """
         ext = os.path.splitext(file_path)[1].lower()
@@ -30,6 +30,7 @@ class DocumentProcessor:
     @staticmethod
     def _process_pdf(file_path: str) -> List[Document]:
         documents = []
+        extracted_text_length = 0
         
         # 1. Extract text and tables using pdfplumber
         with pdfplumber.open(file_path) as pdf:
@@ -37,8 +38,10 @@ class DocumentProcessor:
                 # Extract text
                 text = page.extract_text()
                 if text:
+                    extracted_text_length += len(text.strip())
+                    # Include page number in content for better RAG context
                     documents.append(Document(
-                        page_content=text,
+                        page_content=f"[Page {i + 1}]\n{text}",
                         metadata={"source": file_path, "page": i + 1, "content_type": "text"}
                     ))
                 
@@ -49,12 +52,14 @@ class DocumentProcessor:
                         # Convert table to markdown or CSV-like string
                         table_str = DocumentProcessor._format_table(table)
                         documents.append(Document(
-                            page_content=f"Table on page {i+1}:\n{table_str}",
+                            page_content=f"Table on Page {i + 1}:\n{table_str}",
                             metadata={"source": file_path, "page": i + 1, "content_type": "table", "table_index": table_idx}
                         ))
         
-        # 2. If no text was found, try OCR using unstructured
-        if not documents:
+        # 2. If no text was found, or it's very short (likely a scanned PDF), try OCR.
+        # Increased threshold to 800 characters to be safer.
+        if not documents or extracted_text_length < 800:
+            print(f"Low text content ({extracted_text_length} chars). Attempting OCR for {file_path}...")
             elements = partition(filename=file_path, strategy="ocr_only")
             for el in elements:
                 documents.append(Document(

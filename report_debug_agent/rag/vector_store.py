@@ -37,8 +37,8 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     
     print(f"Documents processed. Splitting {len(all_docs)} elements into chunks...")
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1200,
-        chunk_overlap=200,
+        chunk_size=900,
+        chunk_overlap=180,
         add_start_index=True
     )   
     splits = text_splitter.split_documents(all_docs)
@@ -74,7 +74,7 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
             persist_directory=persist_dir
         )
 
-    _retriever = vectorstore.as_retriever(search_kwargs={"k": 7}) # Increased k for better coverage
+    _retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 10, "fetch_k": 24})
     print("Vector store updated.")
     return _retriever
 
@@ -92,7 +92,7 @@ def get_retriever():
                 model="nomic-embed-text:latest"
             )
             vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
-            _retriever = vectorstore.as_retriever(search_kwargs={"k": 7})
+            _retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 10, "fetch_k": 24})
             print("Vector store auto-initialized from disk.")
             return _retriever
         except Exception as e:

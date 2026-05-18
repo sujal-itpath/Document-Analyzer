@@ -1,6 +1,6 @@
 import os
 from langchain_core.tools import tool
-from rag.vector_store import get_retriever
+from app.services.retrieval import search_docs
 
 @tool
 def search_document(query: str) -> str:
@@ -14,16 +14,9 @@ def search_document(query: str) -> str:
     Returns:
         str: Relevant text snippets from the document.
     """
-    retriever = get_retriever()
-    if not retriever:
-     return "No document has been loaded yet. Please ask the user to provide a document first."
-    
-    # Retrieve relevant document chunks
-    docs = retriever.invoke(query)
-    
-    # Combine the text of the retrieved chunks
+    docs = search_docs(query, k=20)
     if not docs:
-        return "No relevant information found in the documents for that query."
+        return "No relevant information found in the selected documents for that query."
         
     formatted_docs = []
     for doc in docs:

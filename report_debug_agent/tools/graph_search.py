@@ -14,11 +14,9 @@ def graph_search(query: str) -> str:
     Returns:
         str: A summary of related concepts and connections.
     """
-    # In a real implementation, we'd use the query to find entities.
-    # For now, we'll search the graph for nodes matching the query or related to it.
-    related_nodes = knowledge_graph.search_related_entities([query], depth=1)
+    related_nodes = knowledge_graph.search_related_entities([query], depth=2)
     
     if not related_nodes:
         return f"No direct graph connections found for '{query}'."
         
-    return f"Graph connections for '{query}': " + ", ".join(related_nodes)
+    return f"Graph connections for '{query}': " + ", ".join(related_nodes[:15])

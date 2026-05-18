@@ -25,10 +25,10 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onFileUpload, isUploading
       </div>
 
       <label className="relative group cursor-pointer">
-        <input 
-          type="file" 
-          className="hidden" 
-          onChange={onFileUpload} 
+        <input
+          type="file"
+          className="hidden"
+          onChange={onFileUpload}
           accept=".pdf,.docx,.txt,.csv"
           multiple
           disabled={isUploading}
@@ -36,12 +36,12 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onFileUpload, isUploading
         <div className={`
           w-72 h-72 rounded-[48px] border-2 border-dashed
           transition-all duration-500 flex flex-col items-center justify-center gap-6
-          ${isUploading 
-            ? 'bg-accent/5 border-accent animate-pulse' 
+          ${isUploading
+            ? 'bg-accent/5 border-accent animate-pulse'
             : 'bg-card border-border hover:border-accent hover:bg-muted/50 shadow-2xl shadow-black/5'}
         `}>
           {isUploading ? (
-            <>                        
+            <>
               <Loader2 size={48} className="text-accent animate-spin" />
               <div className="text-center px-6">
                 <p className="text-base font-bold mb-1">Processing...</p>
@@ -49,7 +49,7 @@ const UploadSection: React.FC<UploadSectionProps> = ({ onFileUpload, isUploading
               </div>
             </>
           ) : (
-            <> 
+            <>
               <div className="w-20 h-20 rounded-3xl bg-accent/10 text-accent flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:rotate-3">
                 <Upload size={32} />
               </div>

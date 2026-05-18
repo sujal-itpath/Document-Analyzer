@@ -1,16 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
 import { Bot, Mail, Lock, Loader2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { login } = useAuth();
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,8 +29,8 @@ export default function SignupPage() {
         throw new Error(data.detail || 'Signup failed');
       }
 
-      const data = await response.json();
-      login(data.access_token);
+      await response.json();
+      router.push('/login');
     } catch (err: any) {
       setError(err.message);
     } finally {
