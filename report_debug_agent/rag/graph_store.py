@@ -2,7 +2,6 @@ import networkx as nx
 import os
 import json
 from typing import List, Dict
-from langchain_core.documents import Document
 
 class KnowledgeGraph:
     def __init__(self):
@@ -34,7 +33,7 @@ class KnowledgeGraph:
     def search_related_entities(self, entities: List[str], depth: int = 1) -> List[str]:
         """Finds related entities/chunks in the graph."""
         related = set()
-        for entity in entities:
+        for entity in entities: 
             if entity in self.graph:
                 neighbors = nx.single_source_shortest_path_length(self.graph, entity, cutoff=depth)
                 related.update(neighbors.keys())
