@@ -167,6 +167,56 @@ export default function Dashboard() {
     }
   };
 
+  const handleSessionDelete = async (sessionId: string) => {
+    if (!authToken) return;
+    try {
+      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      if (!res.ok) throw new Error('Failed to delete session');
+      
+      setSidebarSessions(prev => prev.filter(s => s.id !== sessionId));
+      
+      // If the currently viewed session is deleted, go back to a clean state
+      if (currentSessionId === sessionId) {
+        handleNewChat();
+      }
+    } catch (err) {
+      console.error('Error deleting session', err);
+    }
+  };
+
+  const handleSessionRename = async (sessionId: string, newTitle: string) => {
+    if (!authToken || !newTitle.trim()) return;
+    try {
+      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}` 
+        },
+        body: JSON.stringify({ title: newTitle.trim() }),
+      });
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+      if (!res.ok) throw new Error('Failed to rename session');
+      
+      const updatedSession = await res.json();
+      setSidebarSessions(prev => 
+        prev.map(s => s.id === sessionId ? { ...s, title: updatedSession.title } : s)
+      );
+    } catch (err) {
+      console.error('Error renaming session', err);
+    }
+  };
+
   useEffect(() => {
     const savedSessionId = localStorage.getItem('current_session_id');
     if (!authToken || loading || currentSessionId) {
@@ -353,6 +403,8 @@ export default function Dashboard() {
         draftSessionTitle={draftSessionTitle}
         optimisticSession={optimisticSession}
         onSessionSelect={handleSessionSelect}
+        onSessionDelete={handleSessionDelete}
+        onSessionRename={handleSessionRename}
         onNewChat={handleNewChat}
       />
 

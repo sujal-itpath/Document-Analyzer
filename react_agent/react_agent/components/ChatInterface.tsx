@@ -268,7 +268,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               {suggestions.map((s, i) => (
                 <button
                   key={i}
-                  onClick={() => onSendMessage(undefined, s)}
+                  onClick={() => {
+                    setInputText(s);
+                    inputRef.current?.focus();
+                  }}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0"
                 >
                   <Sparkles size={10} className="text-accent" />{s}

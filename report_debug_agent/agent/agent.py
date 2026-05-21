@@ -6,11 +6,12 @@ from configs.tools_config import TOOLS
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 load_dotenv()
+from app.core.config import settings
 
-# Using local Ollama endpoint for chat
+# Using local Ollama endpoint for chat from centralized config
 llm = ChatOllama(
-    base_url="http://192.168.1.240:11434",
-    model="gemma4:e4b",  # Updated to available model
+    base_url=settings.OLLAMA_BASE_URL,
+    model=settings.OLLAMA_CHAT_MODEL,
     temperature=0
 )
 

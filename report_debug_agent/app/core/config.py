@@ -10,9 +10,18 @@ class Settings(BaseSettings):
     DB_PATH: str = os.path.join(PROJECT_ROOT, "memory.sqlite")
     PERSIST_DIR: str = os.path.join(PROJECT_ROOT, "chroma_db")
     
+    # Database
+    DATABASE_URL: str = "sqlite:///./app_v2.db"
+    
+    # LLM
     OLLAMA_BASE_URL: str = "http://192.168.1.240:11434"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
     OLLAMA_CHAT_MODEL: str = "gemma4:e4b"
+
+    # Security
+    SECRET_KEY: str = "your-secret-key-change-this-in-production"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080
 
     class Config:
         env_file = ".env"

@@ -1,10 +1,11 @@
 import json
 from langchain_ollama import OllamaLLM
+from app.core.config import settings
 from app.db.database import SessionLocal, Document
 
 class DocumentAnalyzer:
     def __init__(self):
-        self.llm = OllamaLLM(model="gemma4:e4b", base_url="http://192.168.1.240:11434")
+        self.llm = OllamaLLM(model=settings.OLLAMA_CHAT_MODEL, base_url=settings.OLLAMA_BASE_URL)
 
     async def analyze(self, document_id: int, text: str):
         """Perform one-time analysis of a document to generate summary and suggestions."""

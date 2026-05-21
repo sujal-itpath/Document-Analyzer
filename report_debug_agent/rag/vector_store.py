@@ -5,6 +5,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 from app.services.document_processor import DocumentProcessor
+from app.core.config import settings
 
 load_dotenv()
 
@@ -51,8 +52,8 @@ def setup_vector_store(file_paths: list[str], overwrite: bool = True):
     knowledge_graph.save()
     
     embeddings = OllamaEmbeddings(
-        base_url="http://192.168.1.240:11434",
-        model="nomic-embed-text:latest"
+        base_url=settings.OLLAMA_BASE_URL,
+        model=settings.OLLAMA_EMBED_MODEL
     )
     
     persist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
@@ -88,8 +89,8 @@ def get_retriever():
     if os.path.exists(persist_dir):
         try:
             embeddings = OllamaEmbeddings(
-                base_url="http://192.168.1.240:11434",
-                model="nomic-embed-text:latest"
+                base_url=settings.OLLAMA_BASE_URL,
+                model=settings.OLLAMA_EMBED_MODEL
             )
             vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
             _retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs={"k": 10, "fetch_k": 24})

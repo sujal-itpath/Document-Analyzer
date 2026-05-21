@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Home, MessageSquare, LogOut, ChevronLeft, ChevronRight,
-  Plus, History, Bot, Clock
+  Plus, History, Bot, Clock, MoreVertical, Edit2, Trash2, X, Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,6 +22,8 @@ interface SidebarProps {
   draftSessionTitle?: string | null;
   optimisticSession?: Session | null;
   onSessionSelect: (sessionId: string) => void;
+  onSessionRename?: (sessionId: string, newTitle: string) => void;
+  onSessionDelete?: (sessionId: string) => void;
   onNewChat: () => void;
 }
 
@@ -36,9 +38,35 @@ const Sidebar: React.FC<SidebarProps> = ({
   draftSessionTitle,
   optimisticSession,
   onSessionSelect,
+  onSessionRename,
+  onSessionDelete,
   onNewChat,
 }) => {
   const { logout, user } = useAuth();
+  
+  const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState('');
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setActiveMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleRenameSubmit = (e: React.FormEvent, sessionId: string) => {
+    e.preventDefault();
+    if (renameText.trim() && onSessionRename) {
+      onSessionRename(sessionId, renameText.trim());
+    }
+    setRenamingId(null);
+  };
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -76,11 +104,12 @@ const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside
-      className={`bg-card border-r border-border transition-all duration-300 flex flex-col flex-shrink-0 ${
-        isOpen ? 'w-64' : 'w-[72px]'
-      }`}
-    >
+    <>
+      <aside
+        className={`bg-card border-r border-border transition-all duration-300 flex flex-col flex-shrink-0 ${
+          isOpen ? 'w-64' : 'w-[72px]'
+        }`}
+      >
       {/* Header */}
       <div className="p-4 flex items-center justify-between border-b border-border h-16 flex-shrink-0">
         {isOpen && (
@@ -146,31 +175,104 @@ const Sidebar: React.FC<SidebarProps> = ({
             )
           ) : (
             visibleSessions.map(session => (
-              <button
-                key={session.id}
-                onClick={() => {
-                  if (session.id === draftSessionId && !currentSessionId) return;
-                  onSessionSelect(session.id);
-                }}
-                title={!isOpen ? session.title : undefined}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${
-                  currentSessionId === session.id || (!currentSessionId && draftSessionId === session.id)
-                    ? 'bg-accent/10 text-accent border border-accent/20'
-                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                }`}
-                disabled={session.id === draftSessionId && !currentSessionId}
-              >
-                <History size={14} className="flex-shrink-0" />
-                {isOpen && (
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold truncate">{session.title}</p>
-                    <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
-                      <Clock size={9} />
-                      {formatDate(session.created_at)}
-                    </p>
+              <div key={session.id} className="relative group">
+                {renamingId === session.id && isOpen ? (
+                  <form 
+                    onSubmit={(e) => handleRenameSubmit(e, session.id)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all bg-accent/10 text-accent border border-accent/20`}
+                  >
+                    <History size={14} className="flex-shrink-0" />
+                    <input
+                      autoFocus
+                      value={renameText}
+                      onChange={(e) => setRenameText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setRenamingId(null);
+                      }}
+                      className="flex-1 min-w-0 bg-transparent text-xs font-bold outline-none"
+                    />
+                    <button 
+                      type="submit" 
+                      className="p-1 hover:bg-accent/20 rounded"
+                    >
+                      <Check size={12} />
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setRenamingId(null)} 
+                      className="p-1 hover:bg-accent/20 rounded"
+                    >
+                      <X size={12} />
+                    </button>
+                  </form>
+                ) : (
+                  <button
+                    onClick={() => {
+                      if (session.id === draftSessionId && !currentSessionId) return;
+                      onSessionSelect(session.id);
+                    }}
+                    title={!isOpen ? session.title : undefined}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${
+                      currentSessionId === session.id || (!currentSessionId && draftSessionId === session.id)
+                        ? 'bg-accent/10 text-accent border border-accent/20'
+                        : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                    }`}
+                    disabled={session.id === draftSessionId && !currentSessionId}
+                  >
+                    <History size={14} className="flex-shrink-0" />
+                    {isOpen && (
+                      <div className="flex-1 min-w-0 flex items-center justify-between">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-xs font-bold truncate">{session.title}</p>
+                          <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
+                            <Clock size={9} />
+                            {formatDate(session.created_at)}
+                          </p>
+                        </div>
+                        {!(session.id === draftSessionId && !currentSessionId) && (
+                          <div 
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeMenuId === session.id ? 'opacity-100' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                            }}
+                          >
+                            <MoreVertical size={14} className="text-muted-foreground hover:text-foreground" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                )}
+                {activeMenuId === session.id && isOpen && (
+                  <div 
+                    ref={menuRef}
+                    className="absolute right-4 top-10 w-32 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+                  >
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-muted transition-colors text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(null);
+                        setRenameText(session.title);
+                        setRenamingId(session.id);
+                      }}
+                    >
+                      <Edit2 size={12} /> Rename
+                    </button>
+                    <button
+                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-red-500/10 text-red-500 transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveMenuId(null);
+                        setSessionToDelete(session);
+                      }}
+                    >
+                      <Trash2 size={12} /> Delete
+                    </button>
                   </div>
                 )}
-              </button>
+              </div>
             ))
           )}
         </div>
@@ -196,6 +298,35 @@ const Sidebar: React.FC<SidebarProps> = ({
         </button>
       </div>
     </aside>
+      
+      {sessionToDelete && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 shadow-2xl shadow-black/20 animate-in zoom-in-95 duration-300">
+            <h3 className="text-lg font-black mb-2">Delete Chat</h3>
+            <p className="text-sm text-muted-foreground mb-6">
+              Are you sure you want to delete <span className="font-bold text-foreground">"{sessionToDelete.title}"</span>? This action cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setSessionToDelete(null)}
+                className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (onSessionDelete) onSessionDelete(sessionToDelete.id);
+                  setSessionToDelete(null);
+                }}
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

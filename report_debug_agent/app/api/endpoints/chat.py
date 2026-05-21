@@ -47,6 +47,9 @@ class SessionMessagesResponse(BaseModel):
     document_ids: list[int]
     documents: list[SessionDocumentResponse]
 
+class SessionRenameRequest(BaseModel):
+    title: str
+
 class SessionDocumentsUpdateRequest(BaseModel):
     document_ids: list[int]
 
@@ -145,6 +148,36 @@ async def get_session_detail(
         document_ids=document_ids,
         documents=_session_documents_payload(ordered_documents),
     )
+
+@router.patch("/sessions/{session_id}", response_model=SessionResponse)
+async def rename_session(
+    session_id: str,
+    request: SessionRenameRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == current_user.id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    session.title = request.title
+    db.commit()
+    db.refresh(session)
+    return {"id": session.id, "title": session.title, "created_at": session.created_at.isoformat()}
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    session = db.query(ChatSession).filter(ChatSession.id == session_id, ChatSession.user_id == current_user.id).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    db.delete(session)
+    db.commit()
+    return None
 
 @router.get("/sessions/{session_id}/messages", response_model=SessionMessagesResponse)
 async def get_session_messages(

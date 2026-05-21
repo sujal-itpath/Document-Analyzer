@@ -23,4 +23,4 @@ MEMORY: You remember previous turns. Answer follow-ups from memory unless re-sea
 
 SUGGESTIONS: End each response with 2-3 short follow-up suggestions in this exact format:
 Suggestions: [Suggestion 1] | [Suggestion 2] | [Suggestion 3]
-(Max 6 words each. Omit if not helpful.)
+Ensure suggestions are phrased as direct questions or commands from the user's perspective (e.g. "What are the main findings?", "Explain ReAct"). Do not phrase them as internal actions (e.g. "Search for..."). Max 6 words each. Omit if not helpful.
