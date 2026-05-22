@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Sidebar from '../../components/Sidebar';
 import HomeView from '../../components/HomeView';
 import ChatInterface from '../../components/ChatInterface';
+import DocumentViewer from '../../components/DocumentViewer';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
@@ -43,6 +44,31 @@ export default function Dashboard() {
   const [optimisticSession, setOptimisticSession] = useState<SidebarSession | null>(null);
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
   const currentSessionIdRef = useRef<string | undefined>(undefined);
+
+  // Split Pane State
+  const [isSplitView, setIsSplitView] = useState(false);
+  const [splitWidth, setSplitWidth] = useState(50);
+  const [activeDocumentId, setActiveDocumentId] = useState<number | undefined>(undefined);
+
+  const handleDividerMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    document.body.style.cursor = 'col-resize';
+    const handleMouseMove = (ev: MouseEvent) => {
+      const mainElement = document.getElementById('main-chat-container');
+      if (mainElement) {
+        const rect = mainElement.getBoundingClientRect();
+        const newWidth = ((ev.clientX - rect.left) / rect.width) * 100;
+        setSplitWidth(Math.min(Math.max(newWidth, 20), 80));
+      }
+    };
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'default';
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -460,16 +486,47 @@ export default function Dashboard() {
                     {doc.filename}
                   </span>
                 ))}
-                <button
-                  onClick={handleNewChat}
-                  className="ml-auto text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
-                >
-                  Change docs
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={() => setIsSplitView(!isSplitView)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      isSplitView ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'
+                    }`}
+                  >
+                    {isSplitView ? 'Close Split View' : 'Open Split View'}
+                  </button>
+                  <button
+                    onClick={handleNewChat}
+                    className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
+                  >
+                    Change docs
+                  </button>
+                </div>
               </div>
             )}
 
-            <ChatInterface
+            <div id="main-chat-container" className="flex-1 flex overflow-hidden">
+              {isSplitView && (
+                <>
+                  <div style={{ width: `${splitWidth}%` }} className="h-full border-r border-border overflow-hidden bg-background">
+                    <DocumentViewer
+                      documents={selectedDocs}
+                      activeDocumentId={activeDocumentId}
+                      onDocumentChange={setActiveDocumentId}
+                      onQuoteSelect={(quote) => {
+                        setInputText(prev => (prev + '\n' + quote).trimStart());
+                      }}
+                    />
+                  </div>
+                  <div 
+                    onMouseDown={handleDividerMouseDown}
+                    className="w-1.5 hover:w-2 bg-transparent hover:bg-accent/50 cursor-col-resize transition-all shrink-0 z-10 -ml-0.5" 
+                  />
+                </>
+              )}
+              
+              <div style={{ width: isSplitView ? `${100 - splitWidth}%` : '100%' }} className="h-full flex flex-col min-w-0">
+                <ChatInterface
               messages={messages}
               inputText={inputText}
               setInputText={setInputText}
@@ -495,6 +552,8 @@ export default function Dashboard() {
               }}
             />
           </div>
+        </div>
+        </div>
         )}
       </main>
     </div>

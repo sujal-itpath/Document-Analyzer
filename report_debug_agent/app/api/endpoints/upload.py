@@ -1,6 +1,7 @@
 import os
 import shutil
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import get_db, Document as DBDocument, User
@@ -111,3 +112,26 @@ async def delete_document(
     db.delete(doc)
     db.commit()
     return {"status": "deleted", "id": doc_id}
+
+@router.get("/documents/{doc_id}/content")
+async def get_document_content(
+    doc_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Serve the raw file content for a given document."""
+    doc = db.query(DBDocument).filter(
+        DBDocument.id == doc_id,
+        DBDocument.owner_id == current_user.id
+    ).first()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not doc.file_path or not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="Physical file not found on disk")
+
+    return FileResponse(
+        path=doc.file_path,
+        headers={"Content-Disposition": f'inline; filename="{doc.filename}"'}
+    )

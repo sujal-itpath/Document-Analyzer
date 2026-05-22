@@ -25,6 +25,23 @@ interface ChatInterfaceProps {
 const isFilenameOnly = (s: string) =>
   !s.includes('\n') && /^[\w\s\-_()\[\].,]+\.[a-zA-Z0-9]{2,6}$/.test(s.trim());
 
+const renderUserMessage = (content: string) => {
+  const parts = content.split(/(@[\w.-]+)/g);
+  return (
+    <span className="whitespace-pre-wrap">
+      {parts.map((part, i) => 
+        /^@[\w.-]+$/.test(part) ? (
+          <span key={i} className="text-white font-bold bg-white/20 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 mx-0.5 shadow-sm">
+            <FileText size={12} />{part.slice(1)}
+          </span>
+        ) : (
+          part
+        )
+      )}
+    </span>
+  );
+};
+
 const FilenameBadge = ({ name }: { name: string }) => (
   <span className="inline-flex items-center gap-1 bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 rounded-md text-sm font-bold mx-0.5">
     <FileText size={11} className="shrink-0" />{name}
@@ -88,7 +105,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [inputText, resizeInput]);
 
   const insertMention = useCallback((doc: Document) => {
-    setInputText(inputText.replace(/@(\w*)$/, ''));
+    setInputText(inputText.replace(/@(\w*)$/, `@${doc.filename} `));
     setShowMentions(false);
     if (!taggedDocs.find(d => d.id === doc.id)) {
       setTaggedDocs(prev => [...prev, doc]);
@@ -229,7 +246,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                       {msg.displayContent}
                     </ReactMarkdown>
                   ) : (
-                    <span className="whitespace-pre-wrap">{msg.displayContent}</span>
+                    renderUserMessage(msg.displayContent)
                   )}
                 </div>
               </div>
