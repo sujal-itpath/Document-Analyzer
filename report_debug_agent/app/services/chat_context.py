@@ -4,8 +4,10 @@ from typing import Iterable
 allowed_sources_var: ContextVar[set[str] | None] = ContextVar("allowed_sources", default=None)
 
 def set_allowed_sources(sources: Iterable[str] | None):
-    normalized = {source for source in (sources or []) if source}
-    return allowed_sources_var.set(normalized or None)
+    if sources is None:
+        return allowed_sources_var.set(None)
+    normalized = {source for source in sources if source}
+    return allowed_sources_var.set(normalized)
 
 def reset_allowed_sources(token) -> None:
     allowed_sources_var.reset(token)

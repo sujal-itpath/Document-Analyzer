@@ -5,11 +5,12 @@ import Sidebar from '../../components/Sidebar';
 import HomeView from '../../components/HomeView';
 import ChatInterface from '../../components/ChatInterface';
 import DocumentViewer from '../../components/DocumentViewer';
+import IntegrationsView from '../../components/IntegrationsView';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
-type ViewType = 'home' | 'doc-select' | 'chat';
+type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
 type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string };
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
@@ -75,6 +76,17 @@ export default function Dashboard() {
       router.push('/');
     }
   }, [isAuthenticated, loading, router]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has('integration')) {
+        setActiveView('integrations');
+        url.searchParams.delete('integration');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (currentSessionId) {
@@ -414,15 +426,7 @@ export default function Dashboard() {
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
         activeView={activeView}
-        setActiveView={(view) => {
-          if (view === 'home') {
-            setActiveView('home');
-          } else if (view === 'doc-select') {
-            handleNewChat();
-          } else {
-            setActiveView('chat');
-          }
-        }}
+        setActiveView={setActiveView}
         currentSessionId={currentSessionId}
         sessions={sidebarSessions}
         draftSessionId={draftSessionId}
@@ -441,6 +445,17 @@ export default function Dashboard() {
               mode="manage"
               onSelectDocuments={setSelectedDocs}
               onOpenChat={handleOpenChat}
+            />
+          </div>
+        )}
+
+        {activeView === 'integrations' && (
+          <div className="flex-1 overflow-hidden">
+            <IntegrationsView 
+              onSyncComplete={async () => {
+                const latestDocs = await fetchAllDocs();
+                setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
+              }}
             />
           </div>
         )}

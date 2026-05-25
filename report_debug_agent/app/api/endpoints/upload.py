@@ -9,6 +9,7 @@ from app.api.endpoints.auth import get_current_user
 from rag.vector_store import setup_vector_store
 from app.services.document_processor import DocumentProcessor
 from app.services.analyzer import DocumentAnalyzer
+from app.services.google_docs_service import fetch_google_doc_text, extract_doc_id_from_url, list_google_docs
 
 router = APIRouter()
 analyzer = DocumentAnalyzer()
@@ -30,16 +31,31 @@ async def upload_documents(
         filenames = []
         for file in files:
             file_path = os.path.join(settings.UPLOAD_DIR, file.filename)
+            
+            # Check for name clash
+            existing_doc = db.query(DBDocument).filter(
+                DBDocument.owner_id == current_user.id,
+                DBDocument.filename == file.filename
+            ).first()
+            
+            if existing_doc and not is_overwrite:
+                db.rollback()
+                raise HTTPException(status_code=409, detail=f"A document named '{file.filename}' already exists.")
+                
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Save to DB
-            db_doc = DBDocument(
-                filename=file.filename,
-                file_path=file_path,
-                owner_id=current_user.id
-            )
-            db.add(db_doc)
+            # Save to DB (or update if overwrite is true)
+            if existing_doc and is_overwrite:
+                db_doc = existing_doc
+            else:
+                db_doc = DBDocument(
+                    filename=file.filename,
+                    file_path=file_path,
+                    owner_id=current_user.id
+                )
+                db.add(db_doc)
+            
             file_paths.append(file_path)
             filenames.append(file.filename)
             db.flush() # Get the ID for the document
@@ -68,6 +84,84 @@ async def upload_documents(
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
+@router.post("/documents/google")
+async def sync_google_doc(
+    background_tasks: BackgroundTasks,
+    url: str = Form(...),
+    name: str = Form(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Syncs a Google Doc into the database and vector store."""
+    try:
+        # If the URL is just a raw ID without slashes, extract_doc_id_from_url will return the url
+        doc_id = extract_doc_id_from_url(url)
+        
+        # Check if already synced
+        existing_doc = db.query(DBDocument).filter(
+            DBDocument.owner_id == current_user.id,
+            DBDocument.google_doc_id == doc_id
+        ).first()
+        if existing_doc:
+            raise HTTPException(status_code=409, detail="This Google Doc is already synced.")
+        
+        # Determine filename
+        filename = f"{name}.txt" if name else f"GoogleDoc_{doc_id}.txt"
+        
+        # Check name clash
+        name_clash = db.query(DBDocument).filter(
+            DBDocument.owner_id == current_user.id,
+            DBDocument.filename == filename
+        ).first()
+        if name_clash:
+            raise HTTPException(status_code=409, detail=f"A document named '{filename}' already exists.")
+        
+        # Fetch the plain text from Google Drive API
+        text_content = fetch_google_doc_text(current_user.id, doc_id)
+        
+        # Save it locally so the processor/vector store can handle it
+        file_path = os.path.join(settings.UPLOAD_DIR, filename)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(text_content)
+            
+        # Save to DB
+        db_doc = DBDocument(
+            filename=filename,
+            file_path=file_path,
+            owner_id=current_user.id,
+            google_doc_id=doc_id
+        )
+        db.add(db_doc)
+        db.commit()
+        
+        # Analyze and Add to Vector Store
+        try:
+            background_tasks.add_task(analyzer.analyze, db_doc.id, text_content)
+        except Exception as e:
+            print(f"Failed to start analysis for Google Doc: {e}")
+            
+        setup_vector_store([file_path], overwrite=False)
+        
+        return {
+            "status": "ready",
+            "message": "Successfully synced Google Doc.",
+            "filename": filename
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Google Doc Sync failed: {str(e)}")
+
+@router.get("/documents/google/list")
+async def get_google_docs_list(
+    current_user: User = Depends(get_current_user)
+):
+    """Returns a list of Google Docs available to the user."""
+    try:
+        docs = list_google_docs(current_user.id)
+        return {"documents": docs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list Google Docs: {str(e)}")
+
 @router.get("/documents")
 async def get_user_documents(
     db: Session = Depends(get_db),
@@ -82,6 +176,7 @@ async def get_user_documents(
             "upload_date": d.upload_date,
             "summary": d.summary,
             "suggestions": d.suggestions,
+            "google_doc_id": d.google_doc_id
         }
         for d in docs
     ]
@@ -106,8 +201,20 @@ async def delete_document(
     if doc.file_path and os.path.exists(doc.file_path):
         try:
             os.remove(doc.file_path)
-        except OSError as e:
-            print(f"Warning: could not delete file {doc.file_path}: {e}")
+            
+            # Delete from vector store
+            persist_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chroma_db")
+            if os.path.exists(persist_dir):
+                from langchain_chroma import Chroma
+                from langchain_ollama import OllamaEmbeddings
+                embeddings = OllamaEmbeddings(
+                    base_url=settings.OLLAMA_BASE_URL,
+                    model=settings.OLLAMA_EMBED_MODEL
+                )
+                vectorstore = Chroma(persist_directory=persist_dir, embedding_function=embeddings)
+                vectorstore._collection.delete(where={"source": doc.file_path})
+        except Exception as e:
+            print(f"Warning: could not delete file or vector chunks {doc.file_path}: {e}")
 
     db.delete(doc)
     db.commit()

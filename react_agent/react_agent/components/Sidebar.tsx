@@ -14,8 +14,8 @@ interface Session {
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  activeView: 'home' | 'doc-select' | 'chat';
-  setActiveView: (view: 'home' | 'doc-select' | 'chat') => void;
+  activeView: 'home' | 'doc-select' | 'chat' | 'integrations';
+  setActiveView: (view: 'home' | 'doc-select' | 'chat' | 'integrations') => void;
   sessions: Session[];
   currentSessionId?: string;
   draftSessionId?: string | null;
@@ -45,6 +45,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const { logout, user } = useAuth();
   
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
@@ -145,18 +146,40 @@ const Sidebar: React.FC<SidebarProps> = ({
           {isOpen && <span className="font-bold text-sm">Documents</span>}
         </button>
 
+        {/* Integrations link */}
+        <button
+          onClick={() => setActiveView('integrations')}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+            activeView === 'integrations'
+              ? 'bg-accent text-white shadow-lg shadow-accent/20'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+          }`}
+          title={!isOpen ? 'Integrations' : undefined}
+        >
+          <div className="flex-shrink-0 relative w-4 h-4 ml-0.5">
+             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          </div>
+          {isOpen && <span className="font-bold text-sm">Integrations</span>}
+        </button>
+
         {/* Divider */}
         <div className="my-2 border-t border-border/50" />
 
         {/* Chat History section header */}
-        <div className={`flex items-center justify-between px-1 mb-1 ${!isOpen ? 'justify-center' : ''}`}>
+        <div 
+          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+          className={`flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors ${!isOpen ? 'justify-center' : ''}`}
+        >
           {isOpen && (
-            <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">
-              Chat History
-            </span>
+            <div className="flex items-center gap-1.5">
+              {isHistoryExpanded ? <ChevronRight size={12} className="rotate-90 transition-transform" /> : <ChevronRight size={12} className="transition-transform" />}
+              <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">
+                Chat History
+              </span>
+            </div>
           )}
           <button
-            onClick={onNewChat}
+            onClick={(e) => { e.stopPropagation(); onNewChat(); }}
             className="p-1.5 hover:bg-accent/10 rounded-lg text-accent transition-colors"
             title="New Chat"
           >
@@ -165,7 +188,7 @@ const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Session list */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-0.5 min-h-0">
+        <div className={`flex-1 overflow-y-auto custom-scrollbar space-y-0.5 min-h-0 transition-all ${isHistoryExpanded ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
           {visibleSessions.length === 0 ? (
             isOpen && (
               <div className="flex flex-col items-center justify-center py-8 px-2 text-center">

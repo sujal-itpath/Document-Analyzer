@@ -21,6 +21,18 @@ class User(Base):
     
     documents = relationship("Document", back_populates="owner")
     sessions = relationship("ChatSession", back_populates="user")
+    integrations = relationship("UserIntegration", back_populates="user")
+
+class UserIntegration(Base):
+    __tablename__ = "user_integrations"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    provider = Column(String, index=True) # e.g., 'google'
+    access_token = Column(String)
+    refresh_token = Column(String, nullable=True)
+    token_expiry = Column(DateTime, nullable=True)
+    
+    user = relationship("User", back_populates="integrations")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -29,6 +41,7 @@ class Document(Base):
     file_path = Column(String)
     upload_date = Column(DateTime, default=datetime.datetime.utcnow)
     owner_id = Column(Integer, ForeignKey("users.id"))
+    google_doc_id = Column(String, nullable=True, index=True)
     
     # Pre-analyzed data
     summary = Column(String, nullable=True)
@@ -63,10 +76,18 @@ def init_db():
 
 def _ensure_chat_session_columns():
     inspector = inspect(engine)
-    columns = {column["name"] for column in inspector.get_columns("chat_sessions")}
-    if "document_ids" not in columns:
+    
+    # Check chat_sessions
+    chat_columns = {column["name"] for column in inspector.get_columns("chat_sessions")}
+    if "document_ids" not in chat_columns:
         with engine.begin() as connection:
             connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN document_ids VARCHAR NOT NULL DEFAULT '[]'"))
+            
+    # Check documents
+    doc_columns = {column["name"] for column in inspector.get_columns("documents")}
+    if "google_doc_id" not in doc_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE documents ADD COLUMN google_doc_id VARCHAR"))
 
 def get_db():
     db = SessionLocal()

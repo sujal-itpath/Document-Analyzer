@@ -7,14 +7,14 @@ from app.services.chat_context import get_allowed_sources
 from rag.vector_store import get_retriever
 
 def _normalize_source_names(sources: Iterable[str] | None) -> set[str] | None:
-    if not sources:
+    if sources is None:
         return None
     normalized = {os.path.basename(source) for source in sources if source}
-    return normalized or None
+    return normalized
 
 def filter_docs_by_allowed_sources(docs: list[Document]) -> list[Document]:
     allowed_sources = _normalize_source_names(get_allowed_sources())
-    if not allowed_sources:
+    if allowed_sources is None:
         return docs
     return [
         doc for doc in docs
@@ -30,7 +30,10 @@ def search_docs(query: str, k: int = 15) -> list[Document]:
     allowed_sources = get_allowed_sources() # These are now full paths
 
     if vectorstore is not None:
-        if allowed_sources:
+        if allowed_sources is not None:
+            if not allowed_sources:
+                return [] # explicitly empty
+                
             matches: list[Document] = []
             for source_path in allowed_sources:
                 try:
