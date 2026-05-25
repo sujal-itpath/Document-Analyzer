@@ -3,11 +3,13 @@ from tools.summarize_document import summarize_document
 from tools.compare_documents import compare_documents
 from tools.graph_search import graph_search
 from tools.edit_google_doc import edit_google_doc
+from tools.recall_memory import recall_memory
 
 TOOLS = [
     search_document,
     summarize_document,
     compare_documents,
     graph_search,
-    edit_google_doc
+    edit_google_doc,
+    recall_memory,
 ]

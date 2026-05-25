@@ -7,11 +7,12 @@ import ChatInterface from '../../components/ChatInterface';
 import DocumentViewer from '../../components/DocumentViewer';
 import IntegrationsView from '../../components/IntegrationsView';
 import { useAuth } from '../../context/AuthContext';
+import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
 type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
-type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string };
+type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string; isDeleted?: boolean };
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
   messages: Array<{ role: 'user' | 'agent'; content: string; timestamp: string }>;
@@ -44,7 +45,10 @@ export default function Dashboard() {
   const [draftSessionTitle, setDraftSessionTitle] = useState<string | null>(null);
   const [optimisticSession, setOptimisticSession] = useState<SidebarSession | null>(null);
   const [isUploadingDocuments, setIsUploadingDocuments] = useState(false);
+  const [quotedText, setQuotedText] = useState<string | undefined>(undefined);
+  const [warningMessage, setWarningMessage] = useState<string | undefined>(undefined);
   const currentSessionIdRef = useRef<string | undefined>(undefined);
+  const dialog = useDialog();
 
   // Split Pane State
   const [isSplitView, setIsSplitView] = useState(false);
@@ -152,6 +156,9 @@ export default function Dashboard() {
     setMessages([]);
     setSelectedDocs([]);
     setInputText('');
+    setQuotedText(undefined);
+    setIsSplitView(false);
+    setActiveDocumentId(undefined);
     setActiveView('doc-select');
   };
 
@@ -159,6 +166,7 @@ export default function Dashboard() {
     setSelectedDocs(docs);
     setMessages([]);
     setInputText('');
+    setQuotedText(undefined);
     setCurrentSessionId(undefined);
     setDraftSessionId(`draft-${Date.now()}`);
     setDraftSessionTitle(
@@ -197,6 +205,9 @@ export default function Dashboard() {
       setMessages(data.messages.map(message => ({ role: message.role, content: message.content })));
       setSelectedDocs(data.documents);
       setInputText('');
+      setQuotedText(undefined);
+      setIsSplitView(false);
+      setActiveDocumentId(undefined);
       setActiveView('chat');
     } catch (err) {
       console.error('Failed to fetch messages', err);
@@ -265,6 +276,17 @@ export default function Dashboard() {
     }
   }, [authToken, loading, currentSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleDocumentDeleted = (docId: number) => {
+    const deletedDoc = allDocs.find(d => d.id === docId);
+    if (deletedDoc) {
+      if (selectedDocs.some(d => d.id === docId)) {
+        setWarningMessage(`Document "${deletedDoc.filename}" was removed from your workspace. It will no longer be referenced.`);
+        setSelectedDocs(prev => prev.map(d => d.id === docId ? { ...d, isDeleted: true } : d));
+      }
+      setAllDocs(prev => prev.map(d => d.id === docId ? { ...d, isDeleted: true } : d));
+    }
+  };
+
   const persistSessionDocuments = async (sessionId: string, docs: DocumentItem[]) => {
     if (!authToken) return;
     const uniqueIds = Array.from(new Set(docs.map(doc => doc.id)));
@@ -323,7 +345,7 @@ export default function Dashboard() {
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed';
-      alert(message);
+      await dialog.alert({ title: 'Upload Failed', message, variant: 'danger' });
     } finally {
       setIsUploadingDocuments(false);
     }
@@ -331,15 +353,19 @@ export default function Dashboard() {
 
   const handleSendMessage = async (e?: React.FormEvent, messageOverride?: string) => {
     e?.preventDefault();
-    const userMessage = (messageOverride || inputText).trim();
-    if (!userMessage || isThinking) return;
+    const rawInput = (messageOverride || inputText).trim();
+    if (!rawInput && !quotedText) return;
+    if (isThinking) return;
 
     setInputText('');
+    setQuotedText(undefined);
+    
+    const userMessage = quotedText ? `[QUOTED: "${quotedText}"]\n\n${rawInput}` : rawInput;
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsThinking(true);
 
     const requestSessionId = currentSessionIdRef.current;
-    const requestDocumentIds = selectedDocs.map(doc => doc.id);
+    const requestDocumentIds = selectedDocs.filter(d => !d.isDeleted).map(doc => doc.id);
 
     try {
       const res = await fetch('http://localhost:8000/ask', {
@@ -445,6 +471,7 @@ export default function Dashboard() {
               mode="manage"
               onSelectDocuments={setSelectedDocs}
               onOpenChat={handleOpenChat}
+              onDocumentDeleted={handleDocumentDeleted}
             />
           </div>
         )}
@@ -496,9 +523,14 @@ export default function Dashboard() {
                 {selectedDocs.map(doc => (
                   <span
                     key={doc.id}
-                    className="flex items-center gap-1.5 bg-accent/10 border border-accent/20 text-accent px-2.5 py-1 rounded-xl text-[11px] font-bold"
+                    className={`flex items-center gap-1.5 border px-2.5 py-1 rounded-xl text-[11px] font-bold ${
+                      doc.isDeleted 
+                        ? 'bg-muted/40 border-muted text-muted-foreground line-through opacity-70' 
+                        : 'bg-accent/10 border-accent/20 text-accent'
+                    }`}
                   >
                     {doc.filename}
+                    {doc.isDeleted && <span className="ml-1 px-1.5 py-0.5 rounded text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 not-italic no-underline">Deleted</span>}
                   </span>
                 ))}
                 <div className="ml-auto flex items-center gap-2">
@@ -528,9 +560,7 @@ export default function Dashboard() {
                       documents={selectedDocs}
                       activeDocumentId={activeDocumentId}
                       onDocumentChange={setActiveDocumentId}
-                      onQuoteSelect={(quote) => {
-                        setInputText(prev => (prev + '\n' + quote).trimStart());
-                      }}
+                      onQuoteSelect={setQuotedText}
                     />
                   </div>
                   <div 
@@ -553,6 +583,9 @@ export default function Dashboard() {
               selectedDocs={selectedDocs}
               onUploadDocuments={handleUploadDocuments}
               isUploadingDocuments={isUploadingDocuments}
+              quotedText={quotedText}
+              onClearQuote={() => setQuotedText(undefined)}
+              warningMessage={warningMessage}
               onDocumentSelect={(doc) => {
                 setSelectedDocs(prev => {
                   if (prev.find(existing => existing.id === doc.id)) {

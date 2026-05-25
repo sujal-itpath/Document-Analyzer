@@ -37,8 +37,8 @@ def extract_doc_id_from_url(url: str) -> str:
         return match.group(1)
     return url
 
-def fetch_google_doc_text(user_id: int, doc_url_or_id: str) -> str:
-    """Fetches the plain text content of a Google Doc using the Drive API export feature."""
+def fetch_google_doc_docx(user_id: int, doc_url_or_id: str) -> bytes:
+    """Fetches the content of a Google Doc as a .docx file using the Drive API export feature."""
     doc_id = extract_doc_id_from_url(doc_url_or_id)
     creds = get_google_credentials(user_id)
     if not creds:
@@ -46,11 +46,12 @@ def fetch_google_doc_text(user_id: int, doc_url_or_id: str) -> str:
         
     drive_service = build('drive', 'v3', credentials=creds)
     
-    request = drive_service.files().export_media(fileId=doc_id, mimeType='text/plain')
+    request = drive_service.files().export_media(
+        fileId=doc_id, 
+        mimeType='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    )
     response = request.execute()
     
-    if isinstance(response, bytes):
-        return response.decode('utf-8')
     return response
 
 def replace_text_in_doc(user_id: int, doc_url_or_id: str, target_text: str, replacement_text: str) -> bool:

@@ -125,3 +125,49 @@ body {
 .markdown-content h3 {
   line-height: 1.25;
 }
+
+/* Docx HTML Viewer Styles */
+.document-html-viewer h1 {
+  font-size: 1.5rem;
+  font-weight: 900;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.document-html-viewer h2 {
+  font-size: 1.25rem;
+  font-weight: 800;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+}
+.document-html-viewer h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+}
+.document-html-viewer p {
+  margin-bottom: 0.75rem;
+  line-height: 1.75;
+}
+.document-html-viewer ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.document-html-viewer ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+.document-html-viewer li {
+  margin-bottom: 0.25rem;
+}
+.document-html-viewer table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.document-html-viewer th, .document-html-viewer td {
+  border: 1px solid rgba(0,0,0,0.1);
+  padding: 0.5rem;
+}

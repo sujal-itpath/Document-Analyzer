@@ -4,6 +4,7 @@ import {
   CheckCircle2, Circle, MessageCircle, ChevronRight, Upload
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useDialog } from './ui/Dialog';
 
 interface Document {
   id: number;
@@ -19,6 +20,7 @@ interface HomeViewProps {
   /** When 'select', shows a floating "Start Chat" bar. Default: 'manage' */
   mode?: 'manage' | 'select';
   initialSelectedIds?: number[];
+  onDocumentDeleted?: (docId: number) => void;
 }
 
 
@@ -27,6 +29,7 @@ const HomeView = ({
   onOpenChat,
   mode = 'manage',
   initialSelectedIds = [],
+  onDocumentDeleted,
 }: HomeViewProps) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds);
@@ -35,6 +38,7 @@ const HomeView = ({
   const [isMounted, setIsMounted] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
   const { token, logout } = useAuth();
+  const dialog = useDialog();
 
   useEffect(() => {
     setIsMounted(true);
@@ -92,10 +96,10 @@ const HomeView = ({
         await fetchDocuments();
       } else {
         const err = await res.json();
-        alert(err.detail || 'Upload failed');
+        await dialog.alert({ title: 'Upload failed', message: err.detail || 'Upload failed', variant: 'danger' });
       }
     } catch (err) {
-      alert('Upload failed. Please check your connection.');
+      await dialog.alert({ title: 'Upload failed', message: 'Upload failed. Please check your connection.', variant: 'danger' });
     } finally {
       setIsUploading(false);
       event.target.value = '';
@@ -104,7 +108,13 @@ const HomeView = ({
 
   const handleDelete = async (doc: Document, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Delete "${doc.filename}"?`)) return;
+    const confirmed = await dialog.confirm({
+      title: 'Delete document?',
+      message: `Are you sure you want to delete "${doc.filename}"? This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`http://localhost:8000/documents/${doc.id}`, {
         method: 'DELETE',
@@ -118,6 +128,7 @@ const HomeView = ({
         setDocuments(prev => prev.filter(d => d.id !== doc.id));
         setSelectedIds(prev => prev.filter(id => id !== doc.id));
         if (previewDoc?.id === doc.id) setPreviewDoc(null);
+        if (onDocumentDeleted) onDocumentDeleted(doc.id);
       }
     } catch (err) {
       console.error('Delete failed', err);

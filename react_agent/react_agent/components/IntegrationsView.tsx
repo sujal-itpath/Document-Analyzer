@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useDialog } from './ui/Dialog';
 import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff } from 'lucide-react';
 
 interface IntegrationsViewProps {
@@ -23,6 +24,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
   const [googleDocs, setGoogleDocs] = useState<GoogleDoc[]>([]);
   const [workspaceDocs, setWorkspaceDocs] = useState<WorkspaceDoc[]>([]);
   const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const dialog = useDialog();
   const [docsError, setDocsError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -83,16 +85,23 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
       if (res.ok && data.authorization_url) {
         window.location.href = data.authorization_url;
       } else {
-        alert(data.detail || "Failed to initialize Google Login");
+        await dialog.alert({ title: 'Connection Failed', message: data.detail || 'Failed to initialize Google Login', variant: 'danger' });
       }
     } catch (err) {
       console.error("Login redirect failed:", err);
-      alert("Network error trying to reach the server.");
+      await dialog.alert({ title: 'Network Error', message: 'Network error trying to reach the server.', variant: 'danger' });
     }
   };
 
   const handleDisconnectGoogle = async () => {
-    if (!confirm("Are you sure you want to disconnect your Google account?")) return;
+    const confirmed = await dialog.confirm({
+      title: 'Disconnect Google Account',
+      message: 'Are you sure you want to disconnect your Google account? You will lose access to sync new documents.',
+      confirmLabel: 'Disconnect',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+    
     setIsDisconnecting(true);
     try {
       const res = await fetch('http://localhost:8000/auth/google/disconnect', {
@@ -104,10 +113,10 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
         setGoogleDocs([]);
         setDocsError("Not connected to Google. Please connect your account above.");
       } else {
-        alert("Failed to disconnect Google account");
+        await dialog.alert({ title: 'Disconnect Failed', message: 'Failed to disconnect Google account', variant: 'danger' });
       }
     } catch (err) {
-      alert("Network error trying to reach the server.");
+      await dialog.alert({ title: 'Network Error', message: 'Network error trying to reach the server.', variant: 'danger' });
     } finally {
       setIsDisconnecting(false);
     }
@@ -152,7 +161,13 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
     const workspaceDoc = workspaceDocs.find(w => w.google_doc_id === doc.id);
     if (!workspaceDoc) return;
 
-    if (!confirm(`Are you sure you want to unsync "${doc.name}"? This removes it from your AI knowledge base.`)) return;
+    const confirmed = await dialog.confirm({
+      title: 'Unsync Document?',
+      message: `Are you sure you want to unsync "${doc.name}"? This removes it from your AI knowledge base.`,
+      confirmLabel: 'Unsync',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
 
     setSyncingDocId(doc.id);
     try {
@@ -163,14 +178,14 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
 
       if (!res.ok) {
         const err = await res.json();
-        alert(err.detail || "Failed to unsync document");
+        await dialog.alert({ title: 'Unsync Failed', message: err.detail || 'Failed to unsync document', variant: 'danger' });
         return;
       }
 
       await fetchWorkspaceDocs();
       if (onSyncComplete) onSyncComplete();
     } catch (err) {
-      alert("Network error during unsync.");
+      await dialog.alert({ title: 'Network Error', message: 'Network error during unsync.', variant: 'danger' });
     } finally {
       setSyncingDocId(null);
     }

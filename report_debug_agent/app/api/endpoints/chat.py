@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import Optional, List
@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from rag.vector_store import get_retriever
 import uuid
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -230,6 +233,7 @@ async def update_session_documents(
 @router.post("/ask")
 async def ask_question(
     request: QuestionRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -267,6 +271,10 @@ async def ask_question(
     db.add(user_msg)
     db.commit()
 
+    # Track whether this is a brand-new session (for memory consolidation trigger)
+    is_new_session = request.thread_id is None or request.thread_id == ""
+    user_id = current_user.id
+
     async def event_generator():
         token = set_allowed_sources(allowed_sources)
         try:
@@ -275,8 +283,22 @@ async def ask_question(
                 file_context = "\n\n[SYSTEM INFO] Active documents for this chat session: " + ", ".join(allowed_sources)
 
             accumulated_response = ""
-            async for chunk in run_agent_stream(request.question + file_context, thread_id=session_id):
+            first_chunk = True
+            async for chunk in run_agent_stream(
+                request.question + file_context,
+                thread_id=session_id,
+                user_id=user_id,
+            ):
                 accumulated_response += chunk
+                # Trigger memory consolidation once, after the very first chunk arrives
+                if first_chunk and is_new_session:
+                    first_chunk = False
+                    try:
+                        from app.services.memory_consolidator import consolidate_session
+                        background_tasks.add_task(consolidate_session, session_id, user_id)
+                        logger.debug("Memory consolidation scheduled for session %s.", session_id)
+                    except Exception as exc:
+                        logger.warning("Could not schedule memory consolidation: %s", exc)
                 yield chunk
 
             agent_msg = Message(session_id=session_id, role="agent", content=accumulated_response)

@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import { AuthProvider } from "../context/AuthContext";
+import { DialogProvider } from "../components/ui/Dialog";
 
 export default function RootLayout({
   children,
@@ -31,7 +32,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AuthProvider>
-          {children}
+          <DialogProvider>
+            {children}
+          </DialogProvider>
         </AuthProvider>
       </body>
     </html>

@@ -1,5 +1,6 @@
 import os
 import pdfplumber
+import docx
 from unstructured.partition.auto import partition
 from langchain_core.documents import Document
 from typing import List
@@ -16,6 +17,8 @@ class DocumentProcessor:
             return DocumentProcessor._process_pdf(file_path)
         elif ext in ['.png', '.jpg', '.jpeg']:
             return DocumentProcessor._process_image(file_path)
+        elif ext == '.docx':
+            return DocumentProcessor._process_docx(file_path)
         else:
             # Fallback to unstructured for other types
             elements = partition(filename=file_path)
@@ -80,6 +83,19 @@ class DocumentProcessor:
                 metadata={"source": file_path, "content_type": "ocr"}
             ))
         return docs
+
+    @staticmethod
+    def _process_docx(file_path: str) -> List[Document]:
+        doc = docx.Document(file_path)
+        documents = []
+        for para in doc.paragraphs:
+            text = para.text.strip()
+            if text:
+                documents.append(Document(
+                    page_content=text,
+                    metadata={"source": file_path, "content_type": "text"}
+                ))
+        return documents
 
     @staticmethod
     def _format_table(table: List[List[str]]) -> str:

@@ -1,11 +1,14 @@
 'use client';
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Send, User, Bot, Copy, Check, Trash2, FileText, Sparkles, X, AtSign, Upload, Loader2 } from 'lucide-react';
+import {
+  Send, User, Bot, Copy, Check, Trash2, FileText,
+  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 interface Message { role: 'user' | 'agent'; content: string; }
-interface Document { id: number; filename: string; summary?: string; suggestions?: string; }
+interface Document { id: number; filename: string; summary?: string; suggestions?: string; isDeleted?: boolean; }
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -20,6 +23,11 @@ interface ChatInterfaceProps {
   selectedDocs?: Document[];
   onUploadDocuments?: (files: FileList) => Promise<void>;
   isUploadingDocuments?: boolean;
+  /** Raw text to quote (set by document viewer selection). Cleared after send. */
+  quotedText?: string;
+  onClearQuote?: () => void;
+  /** Notification to show (e.g. "Document X was removed"). Auto-dismisses. */
+  warningMessage?: string;
 }
 
 const isFilenameOnly = (s: string) =>
@@ -29,14 +37,12 @@ const renderUserMessage = (content: string) => {
   const parts = content.split(/(@[\w.-]+)/g);
   return (
     <span className="whitespace-pre-wrap">
-      {parts.map((part, i) => 
+      {parts.map((part, i) =>
         /^@[\w.-]+$/.test(part) ? (
           <span key={i} className="text-white font-bold bg-white/20 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 mx-0.5 shadow-sm">
             <FileText size={12} />{part.slice(1)}
           </span>
-        ) : (
-          part
-        )
+        ) : part
       )}
     </span>
   );
@@ -52,6 +58,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages, inputText, setInputText, isThinking,
   onSendMessage, onClearChat, mode, availableDocuments, onDocumentSelect, selectedDocs = [],
   onUploadDocuments, isUploadingDocuments = false,
+  quotedText, onClearQuote, warningMessage,
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -59,10 +66,31 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
   const [taggedDocs, setTaggedDocs] = useState<Document[]>([]);
-  // Suggestions live above the input — updated to latest agent message only
+  const [showWarning, setShowWarning] = useState(false);
+  const [warningText, setWarningText] = useState('');
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Parse suggestions from latest agent message and strip from display
-  const processedMessages = useMemo(() => messages.map((msg) => {
+  // ── Warning banner ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (warningMessage) {
+      setWarningText(warningMessage);
+      setShowWarning(true);
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = setTimeout(() => setShowWarning(false), 4000);
+    }
+    return () => {
+      if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
+    };
+  }, [warningMessage]);
+
+  // ── Sync deleted docs out of taggedDocs ────────────────────────────────────
+  useEffect(() => {
+    const availableIds = new Set(availableDocuments.filter(d => !d.isDeleted).map(d => d.id));
+    setTaggedDocs(prev => prev.filter(d => availableIds.has(d.id)));
+  }, [availableDocuments]);
+
+  // ── Parse suggestions from last agent message ───────────────────────────────
+  const processedMessages = useMemo(() => messages.map(msg => {
     if (msg.role !== 'agent') return { ...msg, displayContent: msg.content };
     const match = msg.content.match(/Suggestions:\s*(.+)$/im);
     let displayContent = msg.content;
@@ -74,7 +102,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return { ...msg, displayContent, parsedSuggestions };
   }), [messages]);
 
-  // Update the suggestions bar whenever messages change — only from the latest agent message
   const suggestions = useMemo<string[]>(() => {
     const lastAgent = [...processedMessages].reverse().find(m => m.role === 'agent') as any;
     return lastAgent?.parsedSuggestions?.length ? lastAgent.parsedSuggestions : [];
@@ -115,17 +142,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   }, [inputText, taggedDocs, onDocumentSelect]);
 
   const filteredDocs = availableDocuments.filter(d =>
-    d.filename.toLowerCase().includes(mentionFilter) && !taggedDocs.find(t => t.id === d.id)
+    !d.isDeleted &&
+    d.filename.toLowerCase().includes(mentionFilter) &&
+    !taggedDocs.find(t => t.id === d.id)
   );
+
+  const handleSend = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!inputText.trim() && !quotedText) return;
+    onSendMessage(e);
+    // Clear tags and quote after send
+    setTaggedDocs([]);
+    onClearQuote?.();
+    setShowMentions(false);
+  }, [inputText, quotedText, onSendMessage, onClearQuote]);
 
   const handleInlineUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0 || !onUploadDocuments) return;
-    try {
-      await onUploadDocuments(files);
-    } finally {
-      event.target.value = '';
-    }
+    try { await onUploadDocuments(files); }
+    finally { event.target.value = ''; }
   };
 
   const mdComponents: any = {
@@ -192,86 +228,74 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {/* Messages */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-8">
-        {processedMessages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-700">
-            <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-6">
-              <Bot size={32} className="text-accent" />
+          {processedMessages.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-700">
+              <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-6">
+                <Bot size={32} className="text-accent" />
+              </div>
+              <h3 className="text-xl font-black mb-2">
+                {mode === 'single' ? 'Document Ready' : 'Documents Ready'}
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-sm">
+                {mode === 'single'
+                  ? 'Ask anything — summaries, details, or specific sections.'
+                  : 'Ask me to compare, summarize, or find differences.'}
+              </p>
+              {onUploadDocuments && (
+                <>
+                  <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
+                  <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}
+                    className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50">
+                    {isUploadingDocuments ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                    {isUploadingDocuments ? 'Uploading...' : 'Add document'}
+                  </button>
+                </>
+              )}
+              <span className="text-xs text-muted-foreground/40 mt-3">Type @ to mention a specific document</span>
             </div>
-            <h3 className="text-xl font-black mb-2">
-              {mode === 'single' ? 'Document Ready' : 'Documents Ready'}
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-sm">
-              {mode === 'single'
-                ? 'Ask anything — summaries, details, or specific sections.'
-                : 'Ask me to compare, summarize, or find differences.'}
-            </p>
-            {onUploadDocuments && (
-              <>
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.txt,.docx,.csv,.md"
-                  onChange={handleInlineUpload}
-                  disabled={isUploadingDocuments}
-                />
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  disabled={isUploadingDocuments}
-                  className="mt-4 flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2 text-sm font-bold transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isUploadingDocuments ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
-                  {isUploadingDocuments ? 'Uploading...' : 'Add document'}
-                </button>
-              </>
-            )}
-            <span className="text-xs text-muted-foreground/40 mt-3">Type @ to mention a specific document</span>
-          </div>
-        ) : (
-          processedMessages.map((msg: any, i: number) => (
-            <div key={i} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`flex min-w-0 gap-3 ${msg.role === 'user' ? 'max-w-[min(78%,860px)] flex-row-reverse' : 'w-full max-w-5xl'}`}>
-                <div className={`mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${msg.role === 'user' ? 'bg-accent text-white' : 'bg-card border border-border'}`}>
-                  {msg.role === 'user' ? <User size={15} /> : <Bot size={15} className="text-accent" />}
-                </div>
-                <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${
-                  msg.role === 'user'
-                    ? 'bg-accent text-white rounded-tr-md'
-                    : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
-                }`}>
-                  {msg.role === 'agent' ? (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
-                      {msg.displayContent}
-                    </ReactMarkdown>
-                  ) : (
-                    renderUserMessage(msg.displayContent)
-                  )}
+          ) : (
+            processedMessages.map((msg: any, i: number) => (
+              <div key={i} className={`flex w-full ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`flex min-w-0 gap-3 ${msg.role === 'user' ? 'max-w-[min(78%,860px)] flex-row-reverse' : 'w-full max-w-5xl'}`}>
+                  <div className={`mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${msg.role === 'user' ? 'bg-accent text-white' : 'bg-card border border-border'}`}>
+                    {msg.role === 'user' ? <User size={15} /> : <Bot size={15} className="text-accent" />}
+                  </div>
+                  <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${
+                    msg.role === 'user'
+                      ? 'bg-accent text-white rounded-tr-md'
+                      : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
+                  }`}>
+                    {msg.role === 'agent' ? (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+                        {msg.displayContent}
+                      </ReactMarkdown>
+                    ) : (
+                      renderUserMessage(msg.displayContent)
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
-        )}
+            ))
+          )}
 
-        {isThinking && (
-          <div className="flex justify-start">
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-xl bg-card border border-border flex items-center justify-center">
-                <Bot size={15} className="text-accent" />
-              </div>
-              <div className="bg-card px-4 py-3 rounded-2xl rounded-tl-none border border-border flex items-center gap-3">
-                <div className="flex gap-1">
-                  {['-0.3s', '-0.15s', '0s'].map((d, i) => (
-                    <div key={i} className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-duration:0.8s]" style={{ animationDelay: d }} />
-                  ))}
+          {isThinking && (
+            <div className="flex justify-start">
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-xl bg-card border border-border flex items-center justify-center">
+                  <Bot size={15} className="text-accent" />
                 </div>
-                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Thinking…</span>
+                <div className="bg-card px-4 py-3 rounded-2xl rounded-tl-none border border-border flex items-center gap-3">
+                  <div className="flex gap-1">
+                    {['-0.3s', '-0.15s', '0s'].map((d, i) => (
+                      <div key={i} className="w-1.5 h-1.5 bg-accent rounded-full animate-bounce [animation-duration:0.8s]" style={{ animationDelay: d }} />
+                    ))}
+                  </div>
+                  <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Thinking…</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
+          )}
+          <div ref={chatEndRef} />
         </div>
       </div>
 
@@ -279,25 +303,44 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="relative z-10 border-t border-border bg-background/95 px-4 py-4 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
 
-          {/* Suggestions bar — updates to latest agent response suggestions */}
+          {/* ── Warning banner ── */}
+          {showWarning && (
+            <div className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-2xl px-4 py-3 animate-in slide-in-from-top-2 duration-300">
+              <AlertTriangle size={15} className="flex-shrink-0" />
+              <span className="text-xs font-bold flex-1">{warningText}</span>
+              <button onClick={() => setShowWarning(false)} className="hover:text-amber-200 transition-colors flex-shrink-0">
+                <X size={13} />
+              </button>
+            </div>
+          )}
+
+          {/* ── Suggestions bar ── */}
           {!isThinking && suggestions.length > 0 && (
             <div className="flex flex-wrap justify-center gap-2 animate-in fade-in duration-300">
               {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setInputText(s);
-                    inputRef.current?.focus();
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0"
-                >
+                <button key={i} onClick={() => { setInputText(s); inputRef.current?.focus(); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0">
                   <Sparkles size={10} className="text-accent" />{s}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Tagged doc chips */}
+          {/* ── Quoted text reply card ── */}
+          {quotedText && (
+            <div className="flex items-start gap-2 bg-accent/5 border-l-4 border-accent rounded-r-2xl px-4 py-2.5 animate-in slide-in-from-bottom-2 duration-200">
+              <MessageSquareQuote size={14} className="text-accent mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-black text-accent uppercase tracking-widest mb-0.5">Quoting</p>
+                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{quotedText}</p>
+              </div>
+              <button onClick={onClearQuote} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0 mt-0.5">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
+          {/* ── Tagged doc chips ── */}
           {taggedDocs.length > 0 && (
             <div className="flex flex-wrap justify-center gap-1.5">
               {taggedDocs.map(doc => (
@@ -311,30 +354,19 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           )}
 
-          {/* Mention dropdown + input */}
+          {/* ── Mention dropdown + input ── */}
           <div className="relative">
             {onUploadDocuments && (
               <div className="mb-2 flex justify-end">
-                <input
-                  ref={uploadInputRef}
-                  type="file"
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.txt,.docx,.csv,.md"
-                  onChange={handleInlineUpload}
-                  disabled={isUploadingDocuments}
-                />
-                <button
-                  type="button"
-                  onClick={() => uploadInputRef.current?.click()}
-                  disabled={isUploadingDocuments}
-                  className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
+                <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}
+                  className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50">
                   {isUploadingDocuments ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
                   {isUploadingDocuments ? 'Uploading...' : 'Upload Document'}
                 </button>
               </div>
             )}
+
             {showMentions && filteredDocs.length > 0 && (
               <div className="absolute bottom-full left-0 mb-2 w-72 max-w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2">
                 <div className="px-3 py-2 bg-muted/40 border-b border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -351,7 +383,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             )}
 
-            <form onSubmit={onSendMessage} className="relative group w-full">
+            <form onSubmit={handleSend} className="relative group w-full">
               <div className="absolute -inset-0.5 bg-accent/20 rounded-[24px] blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
               <textarea
                 ref={inputRef} value={inputText} onChange={handleInputChange}
@@ -362,13 +394,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
-                    onSendMessage();
+                    handleSend();
                   }
                 }}
               />
-              <button type="submit" disabled={!inputText.trim() || isThinking}
+              <button type="submit" disabled={(!inputText.trim() && !quotedText) || isThinking}
                 className={`absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 ${
-                  inputText.trim() && !isThinking ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95' : 'bg-muted text-muted-foreground'
+                  (inputText.trim() || quotedText) && !isThinking
+                    ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
+                    : 'bg-muted text-muted-foreground'
                 }`}>
                 <Send size={16} />
               </button>

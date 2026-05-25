@@ -4,6 +4,9 @@ from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy import create_engine
 import datetime
 from sqlalchemy import inspect
+import logging
+
+logger = logging.getLogger(__name__)
 
 from app.core.config import settings
 
@@ -70,24 +73,41 @@ class Message(Base):
     
     session = relationship("ChatSession", back_populates="messages")
 
+class UserMemoryFact(Base):
+    """SQL-backed store for long-term memory facts extracted from chat sessions."""
+    __tablename__ = "user_memory_facts"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    fact_text = Column(String, nullable=False)
+    source_session_id = Column(String, ForeignKey("chat_sessions.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    user = relationship("User")
+
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_chat_session_columns()
 
 def _ensure_chat_session_columns():
     inspector = inspect(engine)
-    
+    existing_tables = inspector.get_table_names()
+
     # Check chat_sessions
-    chat_columns = {column["name"] for column in inspector.get_columns("chat_sessions")}
-    if "document_ids" not in chat_columns:
-        with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN document_ids VARCHAR NOT NULL DEFAULT '[]'"))
-            
+    if "chat_sessions" in existing_tables:
+        chat_columns = {col["name"] for col in inspector.get_columns("chat_sessions")}
+        if "document_ids" not in chat_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN document_ids VARCHAR NOT NULL DEFAULT '[]'"))
+
     # Check documents
-    doc_columns = {column["name"] for column in inspector.get_columns("documents")}
-    if "google_doc_id" not in doc_columns:
-        with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE documents ADD COLUMN google_doc_id VARCHAR"))
+    if "documents" in existing_tables:
+        doc_columns = {col["name"] for col in inspector.get_columns("documents")}
+        if "google_doc_id" not in doc_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE documents ADD COLUMN google_doc_id VARCHAR"))
+
+    logger.info("DB schema check complete.")
 
 def get_db():
     db = SessionLocal()
