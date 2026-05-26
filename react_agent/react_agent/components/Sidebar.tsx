@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, MessageSquare, ChevronLeft, ChevronRight, LogOut,
-  MoreVertical, Edit2, Trash2, Check, X, History, Clock, Bot,
+  MoreVertical, MoreHorizontal, Edit2, Trash2, Check, X, History, Clock, Bot,
   FileText, Database, Home, Pin, Moon, Sun
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -28,6 +28,15 @@ interface SidebarProps {
   onNewChat: () => void;
 }
 
+const getInitials = (name: string): string => {
+  if (!name) return 'U';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return parts[0].slice(0, 2).toUpperCase();
+};
+
 const Sidebar: React.FC<SidebarProps> = ({
   isOpen,
   setIsOpen,
@@ -43,7 +52,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSessionDelete,
   onNewChat,
 }) => {
-  const { logout, user } = useAuth();
+  const { logout, user, updateProfile } = useAuth();
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(true);
@@ -53,6 +62,21 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [pinnedSessions, setPinnedSessions] = useState<string[]>([]);
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const menuRef = useRef<HTMLDivElement>(null);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editAvatarColor, setEditAvatarColor] = useState('bg-gradient-to-tr from-accent to-indigo-500');
+
+  useEffect(() => {
+    if (user) {
+      setEditDisplayName(user.displayName || '');
+      setEditUsername(user.username || '');
+      setEditAvatarColor(user.avatarColor || 'bg-gradient-to-tr from-accent to-indigo-500');
+    }
+  }, [user, isEditProfileOpen]);
 
   useEffect(() => {
     const savedPins = localStorage.getItem('pinned_sessions');
@@ -80,10 +104,25 @@ const Sidebar: React.FC<SidebarProps> = ({
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editDisplayName.trim() && editUsername.trim()) {
+      updateProfile({
+        displayName: editDisplayName.trim(),
+        username: editUsername.trim(),
+        avatarColor: editAvatarColor,
+      });
+      setIsEditProfileOpen(false);
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setActiveMenuId(null);
+      }
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setIsProfileDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -352,14 +391,73 @@ const Sidebar: React.FC<SidebarProps> = ({
             {theme === 'dark' ? <Sun size={16} className="flex-shrink-0" /> : <Moon size={16} className="flex-shrink-0" />}
             {isOpen && <span className="font-bold text-sm text-foreground/80">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
           </button>
-          <button
-            onClick={logout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-500/10 transition-all"
-            title={!isOpen ? 'Logout' : undefined}
-          >
-            <LogOut size={16} className="flex-shrink-0" />
-            {isOpen && <span className="font-bold text-sm">Logout</span>}
-          </button>
+          <div ref={profileMenuRef} className="relative">
+            {/* Profile Dropdown Menu */}
+            {isProfileDropdownOpen && (
+              <div
+                className={`absolute ${
+                  isOpen ? 'left-0 right-0 bottom-full mb-2.5 w-full' : 'left-full bottom-0 ml-2.5 w-48'
+                } bg-card border border-border rounded-2xl shadow-2xl z-50 p-1.5 space-y-1 overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200`}
+              >
+                {/* Profile Button */}
+                <button
+                  onClick={() => {
+                    setIsProfileDropdownOpen(false);
+                    setIsEditProfileOpen(true);
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground text-xs font-bold transition-all text-left cursor-pointer"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-muted-foreground"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                  <span>Profile</span>
+                </button>
+
+                {/* Divider */}
+                <div className="border-t border-border/50 my-1" />
+
+                {/* Logout Button */}
+                <button
+                  onClick={() => {
+                    setIsProfileDropdownOpen(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 bg-red-500/5 hover:bg-red-500/10 border border-red-500/10 hover:border-red-500/20 text-xs font-bold transition-all text-left cursor-pointer"
+                >
+                  <LogOut size={16} className="flex-shrink-0" />
+                  <span>Logout</span>
+                </button>
+              </div>
+            )}
+
+            {/* Profile Card Trigger */}
+            <button
+              onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
+              className={`w-full flex ${
+                isOpen ? 'items-center justify-between p-2.5' : 'justify-center p-2.5'
+              } rounded-2xl bg-card border border-border hover:border-foreground/20 hover:bg-muted/10 transition-all text-left cursor-pointer`}
+              title={!isOpen ? (user?.email || 'user@example.com') : undefined}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div 
+                  className={`w-9 h-9 rounded-xl ${user?.avatarColor || 'bg-gradient-to-tr from-accent to-indigo-500'} text-white flex items-center justify-center font-bold text-sm shadow-sm flex-shrink-0`}
+                >
+                  {getInitials(user?.username || 'U')}
+                </div>
+                {isOpen && (
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-xs font-black truncate text-foreground leading-tight">
+                      {user?.username || (user?.email ? user.email.split('@')[0] : 'User')}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground truncate leading-tight mt-0.5">
+                      {user?.email || 'user@example.com'}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {isOpen && (
+                <MoreHorizontal size={14} className={`text-muted-foreground transition-transform duration-200 ${isProfileDropdownOpen ? 'rotate-90' : ''} flex-shrink-0`} />
+              )}
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -373,7 +471,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex items-center justify-end gap-3">
               <button
                 onClick={() => setSessionToDelete(null)}
-                className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors"
+                className="px-4 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -382,11 +480,70 @@ const Sidebar: React.FC<SidebarProps> = ({
                   if (onSessionDelete) onSessionDelete(sessionToDelete.id);
                   setSessionToDelete(null);
                 }}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all"
+                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-bold rounded-xl shadow-lg shadow-red-500/20 transition-all cursor-pointer"
               >
                 Delete
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Profile Modal */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border w-full max-w-sm rounded-[32px] p-6 shadow-2xl shadow-black/20 animate-in zoom-in-95 duration-300 relative">
+            <h3 className="text-xl font-black mb-6 text-foreground">Edit profile</h3>
+            
+            {/* Avatar Preview Section */}
+            <div className="flex flex-col items-center justify-center mb-6">
+              <div className="relative animate-in fade-in zoom-in-95 duration-300">
+                <div className={`w-24 h-24 rounded-full ${editAvatarColor} text-white flex items-center justify-center font-bold text-3xl shadow-lg border border-border`}>
+                  {getInitials(editDisplayName || editUsername || user?.email || 'U')}
+                </div>
+              </div>
+            </div>
+
+            {/* Inputs Form */}
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Username</label>
+                <div className="relative group">
+                  <input
+                    type="text"
+                    required
+                    value={editUsername}
+                    onChange={(e) => setEditUsername(e.target.value)}
+                    className="w-full bg-muted/40 border border-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-accent transition-all font-medium text-foreground pr-10"
+                    placeholder="username"
+                  />
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground/45">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-[11px] text-muted-foreground text-center my-4 leading-normal">
+                Your profile helps people recognize you in group chats.
+              </p>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="px-5 py-2.5 border border-border hover:bg-muted text-foreground text-sm font-bold rounded-full transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 bg-foreground text-background hover:opacity-90 text-sm font-bold rounded-full transition-opacity cursor-pointer shadow-lg"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

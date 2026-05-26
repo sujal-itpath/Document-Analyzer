@@ -21,6 +21,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_active = Column(Boolean, default=True)
+    username = Column(String, nullable=True)
+    display_name = Column(String, nullable=True)
+    avatar_color = Column(String, nullable=True)
     
     documents = relationship("Document", back_populates="owner")
     sessions = relationship("ChatSession", back_populates="user")
@@ -106,6 +109,19 @@ def _ensure_chat_session_columns():
         if "google_doc_id" not in doc_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE documents ADD COLUMN google_doc_id VARCHAR"))
+
+    # Check users
+    if "users" in existing_tables:
+        user_columns = {col["name"] for col in inspector.get_columns("users")}
+        if "username" not in user_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN username VARCHAR"))
+        if "display_name" not in user_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN display_name VARCHAR"))
+        if "avatar_color" not in user_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE users ADD COLUMN avatar_color VARCHAR"))
 
     logger.info("DB schema check complete.")
 
