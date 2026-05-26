@@ -163,7 +163,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
 
     const confirmed = await dialog.confirm({
       title: 'Unsync Document?',
-      message: `Are you sure you want to unsync "${doc.name}"? This removes it from your AI knowledge base.`,
+      message: `Are you sure you want to unsync "${doc.name}"?\n\nWarning: This removes it from your AI knowledge base and permanently deletes all associated chat context.`,
       confirmLabel: 'Unsync',
       variant: 'danger'
     });

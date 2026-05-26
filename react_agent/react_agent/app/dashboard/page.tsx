@@ -542,12 +542,23 @@ export default function Dashboard() {
                   >
                     {isSplitView ? 'Close Split View' : 'Open Split View'}
                   </button>
-                  <button
-                    onClick={handleNewChat}
-                    className="text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-accent transition-colors"
-                  >
-                    Change docs
-                  </button>
+                  <label className={`cursor-pointer text-[10px] font-black uppercase tracking-widest transition-colors ${isUploadingDocuments ? 'text-muted-foreground/50' : 'text-muted-foreground hover:text-accent'}`}>
+                    <input 
+                      type="file" 
+                      className="hidden" 
+                      multiple 
+                      accept=".pdf,.txt,.docx,.csv,.md" 
+                      disabled={isUploadingDocuments}
+                      onChange={(e) => {
+                        const files = e.target.files;
+                        if (files && files.length > 0) {
+                          handleUploadDocuments(files);
+                        }
+                        e.target.value = '';
+                      }} 
+                    />
+                    Add Doc
+                  </label>
                 </div>
               </div>
             )}

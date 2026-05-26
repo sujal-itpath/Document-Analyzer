@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Home, MessageSquare, LogOut, ChevronLeft, ChevronRight,
-  Plus, History, Bot, Clock, MoreVertical, Edit2, Trash2, X, Check
+  Plus, MessageSquare, ChevronLeft, ChevronRight, LogOut,
+  MoreVertical, Edit2, Trash2, Check, X, History, Clock, Bot,
+  FileText, Database, Home, Pin, Moon, Sun
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -43,13 +44,41 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewChat,
 }) => {
   const { logout, user } = useAuth();
-  
+
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(true);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameText, setRenameText] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
+  const [pinnedSessions, setPinnedSessions] = useState<string[]>([]);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const savedPins = localStorage.getItem('pinned_sessions');
+    if (savedPins) setPinnedSessions(JSON.parse(savedPins));
+
+    const savedTheme = localStorage.getItem('app_theme') || 'dark';
+    setTheme(savedTheme as 'dark' | 'light');
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  const handleTogglePin = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPinnedSessions(prev => {
+      const newPins = prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id];
+      localStorage.setItem('pinned_sessions', JSON.stringify(newPins));
+      return newPins;
+    });
+    setActiveMenuId(null);
+  };
+
+  const handleToggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('app_theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -107,221 +136,233 @@ const Sidebar: React.FC<SidebarProps> = ({
   return (
     <>
       <aside
-        className={`bg-card border-r border-border transition-all duration-300 flex flex-col flex-shrink-0 ${
-          isOpen ? 'w-64' : 'w-[72px]'
-        }`}
+        className={`bg-card border-r border-border transition-all duration-300 flex flex-col flex-shrink-0 ${isOpen ? 'w-64' : 'w-[72px]'
+          }`}
       >
-      {/* Header */}
-      <div className="p-4 flex items-center justify-between border-b border-border h-16 flex-shrink-0">
-        {isOpen && (
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
-              <Bot size={16} className="text-white" />
-            </div>
-            <span className="font-black tracking-tight text-base">DocuMind</span>
-          </div>
-        )}
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 hover:bg-muted rounded-xl transition-colors ml-auto"
-        >
-          {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
-        </button>
-      </div>
-
-      {/* Navigation */}
-      <nav className="flex-1 flex flex-col overflow-hidden p-3 gap-1">
-
-        {/* Documents link */}
-        <button
-          onClick={() => setActiveView('home')}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-            activeView === 'home'
-              ? 'bg-accent text-white shadow-lg shadow-accent/20'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-          }`}
-          title={!isOpen ? 'Documents' : undefined}
-        >
-          <Home size={18} className="flex-shrink-0" />
-          {isOpen && <span className="font-bold text-sm">Documents</span>}
-        </button>
-
-        {/* Integrations link */}
-        <button
-          onClick={() => setActiveView('integrations')}
-          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-            activeView === 'integrations'
-              ? 'bg-accent text-white shadow-lg shadow-accent/20'
-              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-          }`}
-          title={!isOpen ? 'Integrations' : undefined}
-        >
-          <div className="flex-shrink-0 relative w-4 h-4 ml-0.5">
-             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-          </div>
-          {isOpen && <span className="font-bold text-sm">Integrations</span>}
-        </button>
-
-        {/* Divider */}
-        <div className="my-2 border-t border-border/50" />
-
-        {/* Chat History section header */}
-        <div 
-          onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-          className={`flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors ${!isOpen ? 'justify-center' : ''}`}
-        >
+        {/* Header */}
+        <div className="p-4 flex items-center justify-between border-b border-border h-16 flex-shrink-0">
           {isOpen && (
-            <div className="flex items-center gap-1.5">
-              {isHistoryExpanded ? <ChevronRight size={12} className="rotate-90 transition-transform" /> : <ChevronRight size={12} className="transition-transform" />}
-              <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">
-                Chat History
-              </span>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
+                <Bot size={16} className="text-white" />
+              </div>
+              <span className="font-black tracking-tight text-base">DocuMind</span>
             </div>
           )}
           <button
-            onClick={(e) => { e.stopPropagation(); onNewChat(); }}
-            className="p-1.5 hover:bg-accent/10 rounded-lg text-accent transition-colors"
-            title="New Chat"
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 hover:bg-muted rounded-xl transition-colors ml-auto"
           >
-            <Plus size={16} />
+            {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>
         </div>
 
-        {/* Session list */}
-        <div className={`flex-1 overflow-y-auto custom-scrollbar space-y-0.5 min-h-0 transition-all ${isHistoryExpanded ? 'opacity-100' : 'opacity-0 h-0 hidden'}`}>
-          {visibleSessions.length === 0 ? (
-            isOpen && (
-              <div className="flex flex-col items-center justify-center py-8 px-2 text-center">
-                <MessageSquare size={24} className="text-muted-foreground/30 mb-2" />
-                <p className="text-[10px] text-muted-foreground/40 font-bold">No chats yet</p>
+        {/* Navigation */}
+        <nav className="flex-1 flex flex-col overflow-hidden p-3 gap-1">
+
+          {/* Documents link */}
+          <button
+            onClick={() => setActiveView('home')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeView === 'home'
+              ? 'bg-accent text-white shadow-lg shadow-accent/20'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            title={!isOpen ? 'Documents' : undefined}
+          >
+            <Home size={18} className="flex-shrink-0" />
+            {isOpen && <span className="font-bold text-sm">Documents</span>}
+          </button>
+
+          {/* Integrations link */}
+          <button
+            onClick={() => setActiveView('integrations')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeView === 'integrations'
+              ? 'bg-accent text-white shadow-lg shadow-accent/20'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            title={!isOpen ? 'Integrations' : undefined}
+          >
+            <div className="flex-shrink-0 relative w-4 h-4 ml-0.5">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </div>
+            {isOpen && <span className="font-bold text-sm">Integrations</span>}
+          </button>
+
+          {/* Divider */}
+          <div className="my-2 border-t border-border/50" />
+
+          {/* Chat History section header */}
+          <div
+            onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
+            className={`flex items-center justify-between px-1 mb-1 cursor-pointer hover:bg-muted/50 rounded p-1 transition-colors ${!isOpen ? 'justify-center' : ''}`}
+          >
+            {isOpen && (
+              <div className="flex items-center gap-1.5">
+                {isHistoryExpanded ? <ChevronRight size={12} className="rotate-90 transition-transform" /> : <ChevronRight size={12} className="transition-transform" />}
+                <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.18em]">
+                  Chat History
+                </span>
               </div>
-            )
-          ) : (
-            visibleSessions.map(session => (
-              <div key={session.id} className="relative group">
-                {renamingId === session.id && isOpen ? (
-                  <form 
-                    onSubmit={(e) => handleRenameSubmit(e, session.id)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all bg-accent/10 text-accent border border-accent/20`}
-                  >
-                    <History size={14} className="flex-shrink-0" />
-                    <input
-                      autoFocus
-                      value={renameText}
-                      onChange={(e) => setRenameText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') setRenamingId(null);
+            )}
+            <button
+              onClick={(e) => { e.stopPropagation(); onNewChat(); }}
+              className="p-1.5 hover:bg-accent/10 rounded-lg text-accent transition-colors cursor-pointer"
+              title="New Chat"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+
+          {/* Session list */}
+          <div className={`flex-1 overflow-y-auto custom-scrollbar space-y-0.5 min-h-0 transition-all ${isHistoryExpanded ? 'opacity-100' : 'opacity-0 h-0 hidden cursor-pointer'}`}>
+            {visibleSessions.length === 0 ? (
+              isOpen && (
+                <div className="flex flex-col items-center justify-center py-8 px-2 text-center">
+                  <MessageSquare size={24} className="text-muted-foreground/30 mb-2" />
+                  <p className="text-[10px] text-muted-foreground/40 font-bold">No chats yet</p>
+                </div>
+              )
+            ) : (
+              [...visibleSessions].sort((a, b) => {
+                const aPin = pinnedSessions.includes(a.id);
+                const bPin = pinnedSessions.includes(b.id);
+                if (aPin && !bPin) return -1;
+                if (!aPin && bPin) return 1;
+                return 0; // The array is already date sorted from the parent
+              }).map(session => (
+                <div key={session.id} className="relative group">
+                  {renamingId === session.id && isOpen ? (
+                    <form
+                      onSubmit={(e) => handleRenameSubmit(e, session.id)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all bg-accent/10 text-accent border border-accent/20`}
+                    >
+                      <History size={14} className="flex-shrink-0" />
+                      <input
+                        autoFocus
+                        value={renameText}
+                        onChange={(e) => setRenameText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') setRenamingId(null);
+                        }}
+                        className="flex-1 min-w-0 bg-transparent text-xs font-bold outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="p-1 hover:bg-accent/20 rounded"
+                      >
+                        <Check size={12} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenamingId(null)}
+                        className="p-1 hover:bg-accent/20 rounded"
+                      >
+                        <X size={12} />
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (session.id === draftSessionId && !currentSessionId) return;
+                        onSessionSelect(session.id);
                       }}
-                      className="flex-1 min-w-0 bg-transparent text-xs font-bold outline-none"
-                    />
-                    <button 
-                      type="submit" 
-                      className="p-1 hover:bg-accent/20 rounded"
-                    >
-                      <Check size={12} />
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setRenamingId(null)} 
-                      className="p-1 hover:bg-accent/20 rounded"
-                    >
-                      <X size={12} />
-                    </button>
-                  </form>
-                ) : (
-                  <button
-                    onClick={() => {
-                      if (session.id === draftSessionId && !currentSessionId) return;
-                      onSessionSelect(session.id);
-                    }}
-                    title={!isOpen ? session.title : undefined}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${
-                      currentSessionId === session.id || (!currentSessionId && draftSessionId === session.id)
+                      title={!isOpen ? session.title : undefined}
+                      className={`w-full cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${currentSessionId === session.id || (!currentSessionId && draftSessionId === session.id)
                         ? 'bg-accent/10 text-accent border border-accent/20'
                         : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                    }`}
-                    disabled={session.id === draftSessionId && !currentSessionId}
-                  >
-                    <History size={14} className="flex-shrink-0" />
-                    {isOpen && (
-                      <div className="flex-1 min-w-0 flex items-center justify-between">
-                        <div className="flex-1 min-w-0 pr-2">
-                          <p className="text-xs font-bold truncate">{session.title}</p>
-                          <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
-                            <Clock size={9} />
-                            {formatDate(session.created_at)}
-                          </p>
-                        </div>
-                        {!(session.id === draftSessionId && !currentSessionId) && (
-                          <div 
-                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeMenuId === session.id ? 'opacity-100' : ''}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuId(activeMenuId === session.id ? null : session.id);
-                            }}
-                          >
-                            <MoreVertical size={14} className="text-muted-foreground hover:text-foreground" />
+                        }`}
+                      disabled={session.id === draftSessionId && !currentSessionId}
+                    >
+                      {pinnedSessions.includes(session.id) ? (
+                        <Pin size={14} className="flex-shrink-0 text-accent fill-accent/20" />
+                      ) : (
+                        <History size={14} className="flex-shrink-0" />
+                      )}
+                      {isOpen && (
+                        <div className="flex-1 min-w-0 flex items-center justify-between">
+                          <div className="flex-1 min-w-0 pr-2">
+                            <p className="text-xs font-bold truncate">{session.title}</p>
+                            <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1 mt-0.5">
+                              <Clock size={9} />
+                              {formatDate(session.created_at)}
+                            </p>
                           </div>
-                        )}
-                      </div>
-                    )}
-                  </button>
-                )}
-                {activeMenuId === session.id && isOpen && (
-                  <div 
-                    ref={menuRef}
-                    className="absolute right-4 top-10 w-32 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
-                  >
-                    <button
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-muted transition-colors text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(null);
-                        setRenameText(session.title);
-                        setRenamingId(session.id);
-                      }}
-                    >
-                      <Edit2 size={12} /> Rename
+                          {!(session.id === draftSessionId && !currentSessionId) && (
+                            <div
+                              className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeMenuId === session.id ? 'opacity-100' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                              }}
+                            >
+                              <MoreVertical size={14} className="text-muted-foreground hover:text-foreground" />
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </button>
-                    <button
-                      className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-red-500/10 text-red-500 transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveMenuId(null);
-                        setSessionToDelete(session);
-                      }}
+                  )}
+                  {activeMenuId === session.id && isOpen && (
+                    <div
+                      ref={menuRef}
+                      className="absolute right-4 top-10 w-32 bg-card border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
                     >
-                      <Trash2 size={12} /> Delete
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
-      </nav>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-border flex-shrink-0">
-        {isOpen && (
-          <div className="px-3 mb-3">
-            <p className="text-[9px] font-black text-muted-foreground/50 uppercase tracking-widest mb-0.5">
-              Signed in as
-            </p>
-            <p className="text-sm font-bold truncate text-foreground/80">{user?.email}</p>
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-muted transition-colors text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(null);
+                          setRenameText(session.title);
+                          setRenamingId(session.id);
+                        }}
+                      >
+                        <Edit2 size={12} /> Rename
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-muted transition-colors text-foreground"
+                        onClick={(e) => handleTogglePin(session.id, e)}
+                      >
+                        <Pin size={12} /> {pinnedSessions.includes(session.id) ? 'Unpin' : 'Pin'}
+                      </button>
+                      <button
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium hover:bg-red-500/10 text-red-500 transition-colors"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuId(null);
+                          setSessionToDelete(session);
+                        }}
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
-        )}
-        <button
-          onClick={logout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-500/10 transition-all"
-          title={!isOpen ? 'Logout' : undefined}
-        >
-          <LogOut size={16} className="flex-shrink-0" />
-          {isOpen && <span className="font-bold text-sm">Logout</span>}
-        </button>
-      </div>
-    </aside>
-      
+        </nav>
+
+        {/* Footer */}
+        <div className="p-3 border-t border-border flex-shrink-0 space-y-1">
+          <button
+            onClick={handleToggleTheme}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-all"
+            title={!isOpen ? 'Toggle Theme' : undefined}
+          >
+            {theme === 'dark' ? <Sun size={16} className="flex-shrink-0" /> : <Moon size={16} className="flex-shrink-0" />}
+            {isOpen && <span className="font-bold text-sm text-foreground/80">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>}
+          </button>
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-red-500 hover:bg-red-500/10 transition-all"
+            title={!isOpen ? 'Logout' : undefined}
+          >
+            <LogOut size={16} className="flex-shrink-0" />
+            {isOpen && <span className="font-bold text-sm">Logout</span>}
+          </button>
+        </div>
+      </aside>
+
       {sessionToDelete && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
           <div className="bg-card border border-border w-full max-w-sm rounded-3xl p-6 shadow-2xl shadow-black/20 animate-in zoom-in-95 duration-300">

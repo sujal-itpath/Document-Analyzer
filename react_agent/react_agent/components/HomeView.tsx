@@ -110,7 +110,7 @@ const HomeView = ({
     e.stopPropagation();
     const confirmed = await dialog.confirm({
       title: 'Delete document?',
-      message: `Are you sure you want to delete "${doc.filename}"? This action cannot be undone.`,
+      message: `Are you sure you want to delete "${doc.filename}"?\n\nWarning: This will permanently remove the document and all associated chat context. This action cannot be undone.`,
       confirmLabel: 'Delete',
       variant: 'danger'
     });

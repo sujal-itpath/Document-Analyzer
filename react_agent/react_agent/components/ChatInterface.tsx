@@ -1,7 +1,7 @@
 'use client';
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Send, User, Bot, Copy, Check, Trash2, FileText,
+  Send, User, Bot, Copy, Check, Trash2, FileText, Plus,
   Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -115,7 +115,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const input = inputRef.current;
     if (!input) return;
     input.style.height = 'auto';
-    input.style.height = `${Math.min(input.scrollHeight, 260)}px`;
+    input.style.height = `${Math.min(input.scrollHeight + 2, 260)}px`;
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -177,9 +177,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return <div className="mb-3 last:mb-0">{children}</div>;
     },
     strong: ({ children }: any) => <strong className="font-black">{children}</strong>,
-    ul: ({ children }: any) => <ul className="list-disc ml-5 mb-3 space-y-1">{children}</ul>,
     ol: ({ children }: any) => <ol className="list-decimal ml-5 mb-3 space-y-1">{children}</ol>,
-    li: ({ children }: any) => <li className="text-muted-foreground">{children}</li>,
+    li: ({ children }: any) => <li className="text-foreground/90">{children}</li>,
     h1: ({ children }: any) => <h1 className="text-2xl font-black mb-3 mt-2">{children}</h1>,
     h2: ({ children }: any) => <h2 className="text-xl font-black mb-2 mt-2">{children}</h2>,
     h3: ({ children }: any) => <h3 className="text-lg font-black mb-2">{children}</h3>,
@@ -226,10 +225,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <div className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-8">
+      <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
+        <div className="mx-auto flex flex-1 w-full max-w-6xl flex-col gap-6 px-4 py-6 md:px-8">
           {processedMessages.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-700">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 animate-in fade-in duration-700">
               <div className="w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center mb-6">
                 <Bot size={32} className="text-accent" />
               </div>
@@ -260,11 +259,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <div className={`mt-1 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl ${msg.role === 'user' ? 'bg-accent text-white' : 'bg-card border border-border'}`}>
                     {msg.role === 'user' ? <User size={15} /> : <Bot size={15} className="text-accent" />}
                   </div>
-                  <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${
-                    msg.role === 'user'
+                  <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${msg.role === 'user'
                       ? 'bg-accent text-white rounded-tr-md'
                       : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
-                  }`}>
+                    }`}>
                     {msg.role === 'agent' ? (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
                         {msg.displayContent}
@@ -300,8 +298,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
 
       {/* Input area */}
-      <div className="relative z-10 border-t border-border bg-background/95 px-4 py-4 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-3">
+      <div className="relative z-10 bg-background/95 px-4 py-2 backdrop-blur-xl">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
 
           {/* ── Warning banner ── */}
           {showWarning && (
@@ -315,7 +313,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           )}
 
           {/* ── Suggestions bar ── */}
-          {!isThinking && suggestions.length > 0 && (
+          {/* {!isThinking && suggestions.length > 0 && (
             <div className="flex flex-wrap justify-center gap-2 animate-in fade-in duration-300">
               {suggestions.map((s, i) => (
                 <button key={i} onClick={() => { setInputText(s); inputRef.current?.focus(); }}
@@ -324,7 +322,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </button>
               ))}
             </div>
-          )}
+          )} */}
 
           {/* ── Quoted text reply card ── */}
           {quotedText && (
@@ -356,17 +354,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
           {/* ── Mention dropdown + input ── */}
           <div className="relative">
-            {onUploadDocuments && (
-              <div className="mb-2 flex justify-end">
-                <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
-                <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}
-                  className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50">
-                  {isUploadingDocuments ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
-                  {isUploadingDocuments ? 'Uploading...' : 'Upload Document'}
-                </button>
-              </div>
-            )}
-
             {showMentions && filteredDocs.length > 0 && (
               <div className="absolute bottom-full left-0 mb-2 w-72 max-w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2">
                 <div className="px-3 py-2 bg-muted/40 border-b border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
@@ -384,12 +371,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             )}
 
             <form onSubmit={handleSend} className="relative group w-full">
-              <div className="absolute -inset-0.5 bg-accent/20 rounded-[24px] blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+              <div className="absolute -inset-0.5 bg-accent/20 rounded-[32px] blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
+
+              {onUploadDocuments && (
+                <>
+                  <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
+                  <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}
+                    className="absolute left-2 bottom-2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-card hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50">
+                    {isUploadingDocuments ? <Loader2 size={20} className="animate-spin" /> : <Plus size={24} />}
+                  </button>
+                </>
+              )}
+
               <textarea
                 ref={inputRef} value={inputText} onChange={handleInputChange}
                 placeholder="Ask anything… (@ to mention a document)"
                 rows={1}
-                className="relative block w-full min-h-[72px] max-h-[240px] resize-none overflow-y-auto rounded-[22px] border border-border bg-card px-5 py-4 pr-16 text-[14px] leading-6 shadow-2xl shadow-black/20 transition-all placeholder:text-muted-foreground/40 focus:border-accent focus:outline-none custom-scrollbar"
+                className="relative z-10 block w-full min-h-[56px] max-h-[240px] resize-none overflow-y-auto rounded-[32px] border border-border bg-muted/30 backdrop-blur-md pl-16 py-[16px] pr-16 text-[15px] leading-6 shadow-2xl transition-all placeholder:text-muted-foreground/40 focus:border-accent focus:bg-background focus:outline-none custom-scrollbar"
                 disabled={isThinking}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
@@ -398,26 +396,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   }
                 }}
               />
+
               <button type="submit" disabled={(!inputText.trim() && !quotedText) || isThinking}
-                className={`absolute right-3 bottom-3 flex h-10 w-10 items-center justify-center rounded-2xl transition-all duration-200 ${
-                  (inputText.trim() || quotedText) && !isThinking
+                className={`absolute right-2 bottom-2 z-20 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${(inputText.trim() || quotedText) && !isThinking
                     ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
                     : 'bg-muted text-muted-foreground'
-                }`}>
-                <Send size={16} />
+                  }`}>
+                <Send size={18} />
               </button>
             </form>
-          </div>
-
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/40 font-bold uppercase tracking-widest">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />Agent Active
-            </div>
-            {messages.length > 0 && (
-              <button onClick={onClearChat} className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-red-500 font-bold uppercase tracking-widest transition-colors">
-                <Trash2 size={10} />Clear
-              </button>
-            )}
           </div>
         </div>
       </div>
