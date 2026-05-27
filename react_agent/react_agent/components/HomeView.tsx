@@ -21,6 +21,7 @@ interface HomeViewProps {
   mode?: 'manage' | 'select';
   initialSelectedIds?: number[];
   onDocumentDeleted?: (docId: number) => void;
+  projectId?: number;
 }
 
 
@@ -30,6 +31,7 @@ const HomeView = ({
   mode = 'manage',
   initialSelectedIds = [],
   onDocumentDeleted,
+  projectId,
 }: HomeViewProps) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds);
@@ -43,7 +45,7 @@ const HomeView = ({
   useEffect(() => {
     setIsMounted(true);
     fetchDocuments();
-  }, []);
+  }, [projectId]);
 
   // Notify parent of selection changes
   useEffect(() => {
@@ -54,7 +56,10 @@ const HomeView = ({
 
   const fetchDocuments = async () => {
     try {
-      const res = await fetch('http://localhost:8000/documents', {
+      const url = projectId
+        ? `http://localhost:8000/documents?project_id=${projectId}`
+        : 'http://localhost:8000/documents';
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 401) {
@@ -82,6 +87,9 @@ const HomeView = ({
     const formData = new FormData();
     for (let i = 0; i < files.length; i++) formData.append('files', files[i]);
     formData.append('overwrite', 'false');
+    if (projectId) {
+      formData.append('project_id', projectId.toString());
+    }
     try {
       const res = await fetch('http://localhost:8000/upload', {
         method: 'POST',

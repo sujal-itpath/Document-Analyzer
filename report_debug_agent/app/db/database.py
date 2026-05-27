@@ -28,6 +28,32 @@ class User(Base):
     documents = relationship("Document", back_populates="owner")
     sessions = relationship("ChatSession", back_populates="user")
     integrations = relationship("UserIntegration", back_populates="user")
+    workspaces = relationship("Workspace", back_populates="owner", cascade="all, delete-orphan")
+
+class Workspace(Base):
+    __tablename__ = "workspaces"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    owner = relationship("User", back_populates="workspaces")
+    projects = relationship("Project", back_populates="workspace", cascade="all, delete-orphan")
+
+class Project(Base):
+    __tablename__ = "projects"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id"))
+    owner_id = Column(Integer, ForeignKey("users.id"))
+
+    workspace = relationship("Workspace", back_populates="projects")
+    owner = relationship("User")
+    documents = relationship("Document", back_populates="project", cascade="all, delete-orphan")
+    sessions = relationship("ChatSession", back_populates="project", cascade="all, delete-orphan")
 
 class UserIntegration(Base):
     __tablename__ = "user_integrations"
@@ -48,12 +74,14 @@ class Document(Base):
     upload_date = Column(DateTime, default=datetime.datetime.utcnow)
     owner_id = Column(Integer, ForeignKey("users.id"))
     google_doc_id = Column(String, nullable=True, index=True)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     
     # Pre-analyzed data
     summary = Column(String, nullable=True)
     suggestions = Column(String, nullable=True) # JSON string of suggested questions
     
     owner = relationship("User", back_populates="documents")
+    project = relationship("Project", back_populates="documents")
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
@@ -62,9 +90,11 @@ class ChatSession(Base):
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     document_ids = Column(String, nullable=False, default="[]")
     user_id = Column(Integer, ForeignKey("users.id"))
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     
     user = relationship("User", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
+    project = relationship("Project", back_populates="sessions")
 
 class Message(Base):
     __tablename__ = "messages"
@@ -102,6 +132,9 @@ def _ensure_chat_session_columns():
         if "document_ids" not in chat_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN document_ids VARCHAR NOT NULL DEFAULT '[]'"))
+        if "project_id" not in chat_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE chat_sessions ADD COLUMN project_id INTEGER"))
 
     # Check documents
     if "documents" in existing_tables:
@@ -109,6 +142,9 @@ def _ensure_chat_session_columns():
         if "google_doc_id" not in doc_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE documents ADD COLUMN google_doc_id VARCHAR"))
+        if "project_id" not in doc_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE documents ADD COLUMN project_id INTEGER"))
 
     # Check users
     if "users" in existing_tables:

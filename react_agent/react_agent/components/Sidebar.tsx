@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Plus, MessageSquare, ChevronLeft, ChevronRight, LogOut,
   MoreVertical, MoreHorizontal, Edit2, Trash2, Check, X, History, Clock, Bot,
-  FileText, Database, Home, Pin, Moon, Sun
+  FileText, Database, Home, Pin, Moon, Sun, Folder
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface Session {
   id: string;
@@ -52,7 +53,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onSessionDelete,
   onNewChat,
 }) => {
-  const { logout, user, updateProfile } = useAuth();
+  const { logout, user, updateProfile, activeWorkspace, activeProject } = useAuth();
+  const router = useRouter();
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(true);
@@ -194,6 +196,54 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
           </button>
+        </div>
+
+        {/* Workspace & Project Details */}
+        <div className="px-3 py-2 border-b border-border/50 flex-shrink-0">
+          {isOpen ? (
+            <div className="bg-muted/30 border border-border/40 rounded-2xl p-3.5 space-y-3 relative overflow-hidden">
+              <div>
+                <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.15em] block">
+                  Workspace
+                </span>
+                <span className="text-xs font-bold text-foreground truncate block mt-0.5" title={activeWorkspace?.name}>
+                  {activeWorkspace?.name || 'No Workspace Selected'}
+                </span>
+              </div>
+              <div className="pt-2.5 border-t border-border/40">
+                <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-[0.15em] block">
+                  Active Project
+                </span>
+                <span className="text-xs font-black text-accent truncate block mt-0.5" title={activeProject?.name}>
+                  {activeProject?.name || 'No Project Selected'}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2 mt-2.5">
+                <button
+                  onClick={() => router.push('/workspaces?step=projects')}
+                  className="w-full py-2 px-3 bg-muted hover:bg-muted/80 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-foreground rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Folder size={12} className="text-muted-foreground" />
+                  Switch Project
+                </button>
+                <button
+                  onClick={() => router.push('/workspaces?step=workspaces')}
+                  className="w-full py-2 px-3 bg-muted hover:bg-muted/80 text-[10px] font-black uppercase tracking-wider text-muted-foreground hover:text-foreground rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Database size={12} className="text-muted-foreground" />
+                  Switch Workspace
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => router.push('/workspaces?step=projects')}
+              className="w-full flex items-center justify-center p-2.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-accent transition-all cursor-pointer"
+              title={`Workspace: ${activeWorkspace?.name}\nProject: ${activeProject?.name}`}
+            >
+              <Folder size={18} />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}

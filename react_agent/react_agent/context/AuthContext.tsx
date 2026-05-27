@@ -11,6 +11,10 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   updateProfile: (profileData: { displayName: string; username: string; avatarColor?: string }) => void;
+  activeWorkspace: any | null;
+  activeProject: any | null;
+  selectWorkspace: (workspace: any | null) => void;
+  selectProject: (project: any | null) => void;
 }
 
 const decodeJwtEmail = (token: string): string => {
@@ -44,11 +48,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     user: null,
     loading: true,
   });
+
+  const [activeWorkspace, setActiveWorkspaceState] = useState<any | null>(null);
+  const [activeProject, setActiveProjectState] = useState<any | null>(null);
   
   const router = useRouter();
 
   useEffect(() => {
     const savedToken = localStorage.getItem('auth_token');
+    
+    // Load workspace & project if they exist in localStorage
+    const savedWorkspace = localStorage.getItem('active_workspace');
+    const savedProject = localStorage.getItem('active_project');
+    if (savedWorkspace) {
+      try {
+        setActiveWorkspaceState(JSON.parse(savedWorkspace));
+      } catch (e) {
+        console.error('Failed to parse active_workspace from localStorage', e);
+      }
+    }
+    if (savedProject) {
+      try {
+        setActiveProjectState(JSON.parse(savedProject));
+      } catch (e) {
+        console.error('Failed to parse active_project from localStorage', e);
+      }
+    }
     
     if (!savedToken) {
       setAuthState({
@@ -80,6 +105,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         } else {
           localStorage.removeItem('auth_token');
+          localStorage.removeItem('active_workspace');
+          localStorage.removeItem('active_project');
+          setActiveWorkspaceState(null);
+          setActiveProjectState(null);
           setAuthState({
             token: null,
             user: null,
@@ -126,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           },
           loading: false,
         });
-        router.push('/dashboard');
+        router.push('/workspaces');
       } else {
         throw new Error('Failed to fetch profile during login');
       }
@@ -143,12 +172,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         loading: false,
       });
-      router.push('/dashboard');
+      router.push('/workspaces');
     }
   }, [router]);
 
   const logout = useCallback(() => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('active_workspace');
+    localStorage.removeItem('active_project');
+    setActiveWorkspaceState(null);
+    setActiveProjectState(null);
     setAuthState({
       token: null,
       user: null,
@@ -197,6 +230,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const selectWorkspace = useCallback((workspace: any | null) => {
+    setActiveWorkspaceState(workspace);
+    if (workspace) {
+      localStorage.setItem('active_workspace', JSON.stringify(workspace));
+    } else {
+      localStorage.removeItem('active_workspace');
+    }
+    setActiveProjectState(null);
+    localStorage.removeItem('active_project');
+  }, []);
+
+  const selectProject = useCallback((project: any | null) => {
+    setActiveProjectState(project);
+    if (project) {
+      localStorage.setItem('active_project', JSON.stringify(project));
+    } else {
+      localStorage.removeItem('active_project');
+    }
+  }, []);
+
   const value = useMemo(() => ({
     user: authState.user,
     token: authState.token,
@@ -205,7 +258,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     logout,
     isAuthenticated: !!authState.token,
     updateProfile,
-  }), [authState.user, authState.token, authState.loading, login, logout, updateProfile]);
+    activeWorkspace,
+    activeProject,
+    selectWorkspace,
+    selectProject,
+  }), [authState.user, authState.token, authState.loading, login, logout, updateProfile, activeWorkspace, activeProject, selectWorkspace, selectProject]);
 
   return (
     <AuthContext.Provider value={value}>
@@ -213,7 +270,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
 
 export const useAuth = () => {
   const context = useContext(AuthContext);

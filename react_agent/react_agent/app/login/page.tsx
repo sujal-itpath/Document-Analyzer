@@ -17,7 +17,7 @@ export default function LoginPage() {
   // Redirect already-authenticated users away from login
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.push('/dashboard');
+      router.push('/workspaces');
     }
   }, [isAuthenticated, loading, router]);
 

@@ -32,7 +32,7 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>('home');
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const { isAuthenticated, token: authToken, loading, logout } = useAuth();
+  const { isAuthenticated, token: authToken, loading, logout, activeWorkspace, activeProject } = useAuth();
   const router = useRouter();
 
   const [selectedDocs, setSelectedDocs] = useState<DocumentItem[]>([]);
@@ -76,10 +76,14 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      router.push('/');
+    if (!loading) {
+      if (!isAuthenticated) {
+        router.push('/');
+      } else if (!activeWorkspace || !activeProject) {
+        router.push('/workspaces');
+      }
     }
-  }, [isAuthenticated, loading, router]);
+  }, [isAuthenticated, loading, router, activeWorkspace, activeProject]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -105,9 +109,9 @@ export default function Dashboard() {
   }, [currentSessionId]);
 
   const fetchAllDocs = async (): Promise<DocumentItem[]> => {
-    if (!authToken) return [];
+    if (!authToken || !activeProject) return [];
     try {
-      const res = await fetch('http://localhost:8000/documents', {
+      const res = await fetch(`http://localhost:8000/documents?project_id=${activeProject.id}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -125,9 +129,9 @@ export default function Dashboard() {
   };
 
   const fetchSidebarSessions = async () => {
-    if (!authToken) return;
+    if (!authToken || !activeProject) return;
     try {
-      const res = await fetch('http://localhost:8000/sessions', {
+      const res = await fetch(`http://localhost:8000/sessions?project_id=${activeProject.id}`, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -143,9 +147,11 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    void fetchAllDocs();
-    void fetchSidebarSessions();
-  }, [authToken]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (authToken && activeProject) {
+      void fetchAllDocs();
+      void fetchSidebarSessions();
+    }
+  }, [authToken, activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewChat = () => {
     setCurrentSessionId(undefined);
@@ -304,7 +310,7 @@ export default function Dashboard() {
   };
 
   const handleUploadDocuments = async (files: FileList) => {
-    if (!authToken || files.length === 0) return;
+    if (!authToken || files.length === 0 || !activeProject) return;
 
     setIsUploadingDocuments(true);
     const formData = new FormData();
@@ -312,6 +318,7 @@ export default function Dashboard() {
       formData.append('files', files[i]);
     }
     formData.append('overwrite', 'false');
+    formData.append('project_id', activeProject.id.toString());
 
     try {
       const res = await fetch('http://localhost:8000/upload', {
@@ -378,6 +385,7 @@ export default function Dashboard() {
           question: userMessage,
           thread_id: requestSessionId,
           document_ids: requestSessionId ? [] : requestDocumentIds,
+          project_id: activeProject?.id,
         }),
       });
 
@@ -469,6 +477,7 @@ export default function Dashboard() {
           <div className="flex-1 overflow-hidden">
             <HomeView
               mode="manage"
+              projectId={activeProject?.id}
               onSelectDocuments={setSelectedDocs}
               onOpenChat={handleOpenChat}
               onDocumentDeleted={handleDocumentDeleted}
@@ -479,6 +488,7 @@ export default function Dashboard() {
         {activeView === 'integrations' && (
           <div className="flex-1 overflow-hidden">
             <IntegrationsView 
+              projectId={activeProject?.id}
               onSyncComplete={async () => {
                 const latestDocs = await fetchAllDocs();
                 setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
@@ -506,6 +516,7 @@ export default function Dashboard() {
             <div className="flex-1 overflow-hidden">
               <HomeView
                 mode="select"
+                projectId={activeProject?.id}
                 onSelectDocuments={setSelectedDocs}
                 onOpenChat={handleOpenChat}
               />
