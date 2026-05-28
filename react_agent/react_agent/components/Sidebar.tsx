@@ -16,8 +16,8 @@ interface Session {
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  activeView: 'home' | 'doc-select' | 'chat' | 'integrations';
-  setActiveView: (view: 'home' | 'doc-select' | 'chat' | 'integrations') => void;
+  activeView: 'home' | 'doc-select' | 'chat' | 'integrations' | 'test-cases';
+  setActiveView: (view: 'home' | 'doc-select' | 'chat' | 'integrations' | 'test-cases') => void;
   sessions: Session[];
   currentSessionId?: string;
   draftSessionId?: string | null;
@@ -28,6 +28,7 @@ interface SidebarProps {
   onSessionDelete?: (sessionId: string) => void;
   onNewChat: () => void;
 }
+
 
 const getInitials = (name: string): string => {
   if (!name) return 'U';
@@ -276,6 +277,22 @@ const Sidebar: React.FC<SidebarProps> = ({
             </div>
             {isOpen && <span className="font-bold text-sm">Integrations</span>}
           </button>
+
+          {/* Test Case Generator link */}
+          <button
+            onClick={() => setActiveView('test-cases')}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeView === 'test-cases'
+              ? 'bg-accent text-white shadow-lg shadow-accent/20'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+            title={!isOpen ? 'Test Cases' : undefined}
+          >
+            <div className="flex-shrink-0 relative w-4 h-4 ml-0.5">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            </div>
+            {isOpen && <span className="font-bold text-sm">Test Cases</span>}
+          </button>
+
 
           {/* Divider */}
           <div className="my-2 border-t border-border/50" />

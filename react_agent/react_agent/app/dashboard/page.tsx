@@ -6,12 +6,14 @@ import HomeView from '../../components/HomeView';
 import ChatInterface from '../../components/ChatInterface';
 import DocumentViewer from '../../components/DocumentViewer';
 import IntegrationsView from '../../components/IntegrationsView';
+import TestCaseGenerator from '../../components/TestCaseGenerator';
 import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
 
-type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
+type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations' | 'test-cases';
+
 type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string; isDeleted?: boolean };
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
@@ -38,6 +40,8 @@ export default function Dashboard() {
   const [selectedDocs, setSelectedDocs] = useState<DocumentItem[]>([]);
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [inputText, setInputText] = useState('');
+  const [selectedTestCaseDocFilename, setSelectedTestCaseDocFilename] = useState<string | null>(null);
+
   const [isThinking, setIsThinking] = useState(false);
   const [allDocs, setAllDocs] = useState<DocumentItem[]>([]);
   const [sidebarSessions, setSidebarSessions] = useState<SidebarSession[]>([]);
@@ -481,9 +485,27 @@ export default function Dashboard() {
               onSelectDocuments={setSelectedDocs}
               onOpenChat={handleOpenChat}
               onDocumentDeleted={handleDocumentDeleted}
+              onGenerateTestCases={(docName) => {
+                setSelectedTestCaseDocFilename(docName);
+                setActiveView('test-cases');
+              }}
             />
           </div>
         )}
+
+        {activeView === 'test-cases' && (
+          <div className="flex-1 overflow-hidden">
+            <TestCaseGenerator
+              projectId={activeProject?.id}
+              preSelectedDocFilename={selectedTestCaseDocFilename}
+              onBackToHome={() => {
+                setSelectedTestCaseDocFilename(null);
+                setActiveView('home');
+              }}
+            />
+          </div>
+        )}
+
 
         {activeView === 'integrations' && (
           <div className="flex-1 overflow-hidden">

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://192.168.1.240:11434"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
     OLLAMA_CHAT_MODEL: str = "gemma4:e4b"
+    GEMINI_API_KEY: str | None = None
+    GOOGLE_API_KEY: str | None = None
+
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-this-in-production"

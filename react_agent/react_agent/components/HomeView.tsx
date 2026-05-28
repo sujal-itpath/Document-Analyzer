@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   FileText, Plus, Trash2, Calendar, Loader2, X, Eye,
-  CheckCircle2, Circle, MessageCircle, ChevronRight, Upload
+  CheckCircle2, Circle, MessageCircle, ChevronRight, Upload, Sparkles
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
@@ -22,6 +22,7 @@ interface HomeViewProps {
   initialSelectedIds?: number[];
   onDocumentDeleted?: (docId: number) => void;
   projectId?: number;
+  onGenerateTestCases?: (filename: string) => void;
 }
 
 
@@ -32,6 +33,7 @@ const HomeView = ({
   initialSelectedIds = [],
   onDocumentDeleted,
   projectId,
+  onGenerateTestCases,
 }: HomeViewProps) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds);
@@ -396,6 +398,13 @@ const HomeView = ({
             >
               <MessageCircle size={16} />
               Chat with this Document
+            </button>
+            <button
+              onClick={() => { onGenerateTestCases?.(previewDoc.filename); setPreviewDoc(null); }}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent to-indigo-500 text-white py-3 rounded-2xl font-black text-sm shadow-lg shadow-indigo-500/20 hover:shadow-xl hover:shadow-indigo-500/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Sparkles size={16} />
+              Generate Test Cases
             </button>
             <button
               onClick={() => setPreviewDoc(null)}
