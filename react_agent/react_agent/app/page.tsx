@@ -13,7 +13,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      router.push('/dashboard');
+      router.push('/workspaces');
     }
   }, [isAuthenticated, loading, router]);
 

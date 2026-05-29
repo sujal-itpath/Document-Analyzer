@@ -5,6 +5,7 @@ import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff } 
 
 interface IntegrationsViewProps {
   onSyncComplete?: () => void;
+  projectId?: number;
 }
 
 type GoogleDoc = {
@@ -19,7 +20,7 @@ type WorkspaceDoc = {
   google_doc_id?: string;
 };
 
-const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) => {
+const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, projectId }) => {
   const { token, logout } = useAuth();
   const [googleDocs, setGoogleDocs] = useState<GoogleDoc[]>([]);
   const [workspaceDocs, setWorkspaceDocs] = useState<WorkspaceDoc[]>([]);
@@ -35,7 +36,10 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
 
   const fetchWorkspaceDocs = async () => {
     try {
-      const res = await fetch('http://localhost:8000/documents', {
+      const url = projectId
+        ? `http://localhost:8000/documents?project_id=${projectId}`
+        : 'http://localhost:8000/documents';
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -74,7 +78,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
   useEffect(() => {
     fetchWorkspaceDocs();
     fetchGoogleDocsList();
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [token, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnectGoogle = async () => {
     try {
@@ -130,6 +134,9 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete }) =
       const formData = new FormData();
       formData.append('url', doc.id);
       formData.append('name', doc.name);
+      if (projectId) {
+        formData.append('project_id', projectId.toString());
+      }
 
       const res = await fetch('http://localhost:8000/documents/google', {
         method: 'POST',

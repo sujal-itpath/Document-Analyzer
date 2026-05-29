@@ -20,6 +20,7 @@ class QuestionRequest(BaseModel):
     question: str
     thread_id: Optional[str] = None
     document_ids: list[int] = []
+    project_id: Optional[int] = None
 
 class MessageResponse(BaseModel):
     role: str
@@ -125,10 +126,14 @@ def _resolve_session_document_ids(
 
 @router.get("/sessions", response_model=List[SessionResponse])
 async def list_sessions(
+    project_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    sessions = db.query(ChatSession).filter(ChatSession.user_id == current_user.id).order_by(ChatSession.created_at.desc()).all()
+    query = db.query(ChatSession).filter(ChatSession.user_id == current_user.id)
+    if project_id is not None:
+        query = query.filter(ChatSession.project_id == project_id)
+    sessions = query.order_by(ChatSession.created_at.desc()).all()
     return [{"id": s.id, "title": s.title, "created_at": s.created_at.isoformat()} for s in sessions]
 
 @router.get("/sessions/{session_id}", response_model=SessionDetailResponse)
@@ -257,6 +262,7 @@ async def ask_question(
             user_id=current_user.id,
             title=request.question[:30] + ("..." if len(request.question) > 30 else ""),
             document_ids=_serialize_document_ids(request.document_ids),
+            project_id=request.project_id,
         )
         db.add(session)
         db.commit()
