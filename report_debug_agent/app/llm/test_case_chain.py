@@ -120,3 +120,31 @@ def _parse_json_response(raw: str) -> Dict[str, list]:
             f"JSON error: {e}\n"
             f"Raw response (first 500 chars):\n{raw[:500]}"
         )
+
+def generate_updated_test_case_output(
+    documents: List[str],
+    metadatas: List[dict],
+    existing_tc: dict,
+    instruction: str,
+) -> dict:
+    from app.prompts.test_case_prompts import build_updated_test_case_prompt
+
+    context_parts = []
+    for doc, meta in zip(documents, metadatas):
+        page_label = f"[Page {meta.get('page', '?')}]"
+        context_parts.append(f"{page_label}\n{doc}")
+    context = "\n\n---\n\n".join(context_parts)
+
+    prompt = build_updated_test_case_prompt(context, existing_tc, instruction)
+    raw_response = generate_text(prompt)
+    
+    cleaned = re.sub(r"```(?:json)?\s*", "", raw_response).strip()
+    cleaned = cleaned.rstrip("`").strip()
+
+    try:
+        parsed = json.loads(cleaned)
+        if not isinstance(parsed, dict):
+            raise ValueError("Expected a JSON object (dict).")
+        return parsed
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Gemini returned invalid JSON for update. Error: {e}")

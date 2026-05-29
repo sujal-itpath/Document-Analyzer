@@ -169,3 +169,62 @@ async def generate_test_cases_endpoint(
         ),
         message=f"{total_cases} test case(s) generated successfully across {len(typed_test_cases)} module(s).",
     )
+
+from app.models.test_case_models import TestCaseUpdateRequest
+
+@router.post(
+    "/update",
+    response_model=ApiResponse[TestCase],
+    status_code=200,
+    summary="Update a single BDD test case using AI",
+    description="Updates an existing test case using AI based on user instructions.",
+)
+async def update_test_case_endpoint(
+    request: TestCaseUpdateRequest,
+) -> ApiResponse[TestCase]:
+    collection_name = sanitise_collection_name(request.filename)
+
+    if not collection_exists(collection_name):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document '{request.filename}' is not indexed."
+        )
+
+    from app.pipeline.test_case_pipeline import update_test_case
+    
+    try:
+        updated_tc_dict = update_test_case(
+            collection_name=collection_name,
+            existing_tc=request.test_case.dict(),
+            instruction=request.instruction,
+        )
+        
+        # Parse it into a TestCase model
+        criteria = AcceptanceCriteria(
+            given=updated_tc_dict.get("acceptance_criteria", {}).get("given", []),
+            when=updated_tc_dict.get("acceptance_criteria", {}).get("when", []),
+            then=updated_tc_dict.get("acceptance_criteria", {}).get("then", []),
+        )
+        updated_test_case = TestCase(
+            id=updated_tc_dict.get("id", request.test_case.id),
+            title=updated_tc_dict.get("title", request.test_case.title),
+            type=updated_tc_dict.get("type", request.test_case.type),
+            priority=updated_tc_dict.get("priority", request.test_case.priority),
+            acceptance_criteria=criteria,
+            tags=updated_tc_dict.get("tags"),
+            linked_requirement=updated_tc_dict.get("linked_requirement")
+        )
+        
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Test case update failed: {str(e)}",
+        )
+
+    return ApiResponse(
+        status=200,
+        data=updated_test_case,
+        message="Test case updated successfully."
+    )

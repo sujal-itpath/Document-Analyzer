@@ -18,6 +18,7 @@ class TestCase(BaseModel):
     acceptance_criteria: AcceptanceCriteria
     tags: Optional[List[str]] = None
     linked_requirement: Optional[str] = None
+    generation_status: Optional[str] = "AI Generated"
 
 class TestCaseResponseData(BaseModel):
     filename: str
@@ -25,3 +26,8 @@ class TestCaseResponseData(BaseModel):
     total_cases: int
     citations: List[int]
     test_cases: Dict[str, List[TestCase]]
+
+class TestCaseUpdateRequest(BaseModel):
+    filename: str
+    test_case: TestCase
+    instruction: str

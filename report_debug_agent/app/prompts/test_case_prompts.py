@@ -216,3 +216,37 @@ def build_test_case_prompt_v2(context: str, documents_count: int, page_numbers: 
 # Point this alias to whichever version you want to use right now.
 # The backend chain (test_case_chain.py) strictly uses this alias.
 build_test_case_prompt = build_test_case_prompt_v2
+
+def build_updated_test_case_prompt(context: str, existing_tc: dict, instruction: str) -> str:
+    """
+    Prompt to update a specific test case based on user instruction.
+    """
+    import json
+    tc_json = json.dumps(existing_tc, indent=2)
+    return f"""
+        <role>
+        You are a senior QA engineer. Your task is to update an existing BDD test case based on the user's instructions and the original requirement context.
+        </role>
+
+        <task>
+        1. Review the existing test case JSON.
+        2. Read the user's instruction on how to modify it.
+        3. Make the necessary changes (e.g., adding Given/When/Then steps, changing priority, modifying the title).
+        4. Maintain the exact same JSON schema.
+        5. Return ONLY the updated test case JSON object, without any markdown formatting or explanation.
+        </task>
+
+        <user_instruction>
+        {instruction}
+        </user_instruction>
+
+        <existing_test_case>
+        {tc_json}
+        </existing_test_case>
+
+        <context>
+        {context}
+        </context>
+
+        Return ONLY the updated JSON object. Do not wrap it in a module name or an array. Just the object itself.
+    """

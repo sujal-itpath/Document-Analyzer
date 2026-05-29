@@ -18,9 +18,9 @@ logger = logging.getLogger(__name__)
 
 def _get_gemini_api_key() -> str:
     """Retrieve Gemini API key from environment or settings."""
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") 
     if not api_key:
-        api_key = getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "GOOGLE_API_KEY", None)
+        api_key = getattr(settings, "GEMINI_API_KEY", None)
     return api_key
 
 def _init_gemini_llm(model_name: str, api_key: str):
@@ -65,7 +65,7 @@ def generate_text(prompt: str) -> str:
         )
 
     # Primary and fallback Gemini models
-    primary_model = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+    primary_model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     fallback_models: List[str] = ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"]
     models_to_try = [primary_model] + [m for m in fallback_models if m != primary_model]
 

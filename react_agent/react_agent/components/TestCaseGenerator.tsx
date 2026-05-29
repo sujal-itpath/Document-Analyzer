@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
+import { TestCaseCard } from './TestCaseCard';
 
 interface Document {
   id: number;
@@ -34,6 +35,7 @@ interface TestCase {
   tags?: string[];
   linked_requirement?: string;
   acceptance_criteria: AcceptanceCriteria;
+  generation_status?: string;
 }
 
 interface TestCaseResponse {
@@ -403,13 +405,6 @@ const TestCaseGenerator = ({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={copyToClipboard}
-                  className="flex items-center gap-1.5 px-4 py-2 hover:bg-muted text-muted-foreground hover:text-foreground rounded-xl text-xs font-bold transition-all border border-border bg-background"
-                >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                  {copied ? 'Copied JSON!' : 'Copy JSON'}
-                </button>
-                <button
                   onClick={exportCSV}
                   className="flex items-center gap-1.5 px-4 py-2 bg-accent text-white hover:bg-accent/90 rounded-xl text-xs font-black transition-all border border-accent/10 shadow-lg shadow-accent/15"
                 >
@@ -457,93 +452,26 @@ const TestCaseGenerator = ({
               {/* Right test cases display panel */}
               <div className="md:col-span-3 space-y-4 overflow-y-auto pr-2 custom-scrollbar">
                 {results.test_cases[activeModule]?.map((tc) => (
-                  <div
-                    key={tc.id}
-                    className="bg-card border border-border p-5 rounded-[24px] space-y-4 hover:border-accent/40 hover:shadow-lg transition-all"
-                  >
-                    {/* TestCase Header */}
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                          <span className="text-xs font-black text-accent bg-accent/10 px-2 py-0.5 rounded-md border border-accent/15">
-                            {tc.id}
-                          </span>
-                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${getPriorityColor(tc.priority)}`}>
-                            {tc.priority} Priority
-                          </span>
-                          {tc.linked_requirement && (
-                            <span className="text-[10px] font-bold text-muted-foreground/75 bg-muted/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <Bookmark size={9} />
-                              {tc.linked_requirement}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="text-sm font-black text-foreground">{tc.title}</h4>
-                      </div>
-                    </div>
-
-                    {/* Acceptance criteria Given/When/Then lists */}
-                    <div className="bg-muted/30 border border-border/40 rounded-2xl p-4 space-y-3.5">
-                      {tc.acceptance_criteria.given.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 block">
-                            Given (Preconditions)
-                          </span>
-                          <ul className="space-y-1.5 pl-0.5">
-                            {tc.acceptance_criteria.given.map((item, idx) => (
-                              <li key={idx} className="text-xs font-medium text-foreground flex items-start gap-2">
-                                <span className="text-blue-500 font-bold mt-0.5">•</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {tc.acceptance_criteria.when.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 block">
-                            When (Trigger Actions)
-                          </span>
-                          <ul className="space-y-1.5 pl-0.5">
-                            {tc.acceptance_criteria.when.map((item, idx) => (
-                              <li key={idx} className="text-xs font-medium text-foreground flex items-start gap-2">
-                                <span className="text-amber-500 font-bold mt-0.5">•</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {tc.acceptance_criteria.then.length > 0 && (
-                        <div className="space-y-1">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60 block">
-                            Then (Expected Results)
-                          </span>
-                          <ul className="space-y-1.5 pl-0.5">
-                            {tc.acceptance_criteria.then.map((item, idx) => (
-                              <li key={idx} className="text-xs font-medium text-foreground flex items-start gap-2">
-                                <span className="text-emerald-500 font-bold mt-0.5">•</span>
-                                {item}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Tags */}
-                    {tc.tags && tc.tags.length > 0 && (
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {tc.tags.map((tag) => (
-                          <span key={tag} className="text-[9px] font-black uppercase tracking-wider bg-muted text-muted-foreground px-2 py-0.5 rounded">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <TestCaseCard 
+                    key={tc.id} 
+                    testCase={tc} 
+                    filename={results.filename}
+                    onUpdate={(updatedTc) => {
+                      setResults(prev => {
+                        if (!prev) return prev;
+                        const newModuleCases = prev.test_cases[activeModule].map(item => 
+                          item.id === tc.id ? updatedTc : item
+                        );
+                        return {
+                          ...prev,
+                          test_cases: {
+                            ...prev.test_cases,
+                            [activeModule]: newModuleCases
+                          }
+                        };
+                      });
+                    }}
+                  />
                 ))}
               </div>
             </div>

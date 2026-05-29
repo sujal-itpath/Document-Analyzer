@@ -86,3 +86,29 @@ def generate_test_cases(
     )
 
     return test_cases_dict, citations
+
+def update_test_case(
+    collection_name: str,
+    existing_tc: dict,
+    instruction: str,
+) -> dict:
+    """
+    Pipeline to update a specific test case based on user instruction.
+    """
+    from app.llm.test_case_chain import generate_updated_test_case_output
+
+    documents, metadatas = retrieve_context(_BROAD_QUERY, collection_name)
+
+    if not documents:
+        raise ValueError(
+            "No content could be retrieved from the document."
+        )
+
+    updated_tc = generate_updated_test_case_output(
+        documents=documents,
+        metadatas=metadatas,
+        existing_tc=existing_tc,
+        instruction=instruction,
+    )
+
+    return updated_tc
