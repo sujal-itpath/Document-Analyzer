@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Send, User, Bot, Copy, Check, Trash2, FileText, Plus,
-  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle
+  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle, Code, Terminal
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -54,6 +54,18 @@ const FilenameBadge = ({ name }: { name: string }) => (
   </span>
 );
 
+interface SlashCommand {
+  name: string;
+  description: string;
+}
+
+const SLASH_COMMANDS: SlashCommand[] = [
+  { name: 'document-mind', description: 'Analyze, summarize, and interact with documents using AI' },
+  { name: 'mindmap', description: 'Turn documents into structured visual knowledge' },
+  { name: 'doc-chat', description: 'Chat with your documents intelligently' },
+  { name: 'extract-insights', description: 'Pull key ideas, summaries, and action items' },
+];
+
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages, inputText, setInputText, isThinking,
   onSendMessage, onClearChat, mode, availableDocuments, onDocumentSelect, selectedDocs = [],
@@ -65,7 +77,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const [showMentions, setShowMentions] = useState(false);
   const [mentionFilter, setMentionFilter] = useState('');
+  const [showSlashCommands, setShowSlashCommands] = useState(false);
+  const [slashFilter, setSlashFilter] = useState('');
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [taggedDocs, setTaggedDocs] = useState<Document[]>([]);
+
+  // Reset selected suggestion index when filters or dropdown states change
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [slashFilter, mentionFilter, showSlashCommands, showMentions]);
   const [showWarning, setShowWarning] = useState(false);
   const [warningText, setWarningText] = useState('');
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -121,13 +141,29 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInputText(value);
-    
+
     // Check if any tagged document was removed from the text
     setTaggedDocs(prev => prev.filter(doc => value.includes(`@${doc.filename}`)));
-    
+
+
+    // Match @ document mentions
     const m = value.match(/@(\w*)$/);
-    setShowMentions(!!m);
-    setMentionFilter(m ? m[1].toLowerCase() : '');
+    if (m) {
+      setShowMentions(true);
+      setMentionFilter(m[1].toLowerCase());
+      setShowSlashCommands(false);
+    } else {
+      setShowMentions(false);
+
+      // Match / slash commands at start of line or string
+      const s = value.match(/^\/(\w*)$/);
+      if (s) {
+        setShowSlashCommands(true);
+        setSlashFilter(s[1].toLowerCase());
+      } else {
+        setShowSlashCommands(false);
+      }
+    }
     requestAnimationFrame(resizeInput);
   };
 
@@ -145,11 +181,23 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     inputRef.current?.focus();
   }, [inputText, taggedDocs, onDocumentSelect]);
 
+  const insertSlashCommand = useCallback((cmd: SlashCommand) => {
+    setInputText(`/${cmd.name} `);
+    setShowSlashCommands(false);
+    inputRef.current?.focus();
+  }, [inputRef]);
+
   const filteredDocs = availableDocuments.filter(d =>
     !d.isDeleted &&
     d.filename.toLowerCase().includes(mentionFilter) &&
     !taggedDocs.find(t => t.id === d.id)
   );
+
+  const filteredSlashCommands = useMemo(() => {
+    return SLASH_COMMANDS.filter(cmd =>
+      cmd.name.toLowerCase().includes(slashFilter)
+    );
+  }, [slashFilter]);
 
   const handleSend = useCallback((e?: React.FormEvent) => {
     e?.preventDefault();
@@ -174,7 +222,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         const parts = children.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
         return <div className="mb-3 last:mb-0">{parts.map((p: string, i: number) =>
           p.startsWith('@') && isFilenameOnly(p.slice(1))
-            ? <span key={i} className="text-blue-400 font-bold bg-blue-500/10 px-1 rounded inline-flex items-center gap-1"><FileText size={11} className="inline"/> {p}</span>
+            ? <span key={i} className="text-blue-400 font-bold bg-blue-500/10 px-1 rounded inline-flex items-center gap-1"><FileText size={11} className="inline" /> {p}</span>
             : p
         )}</div>;
       }
@@ -202,9 +250,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const langMatch = /language-(\w+)/.exec(className || '');
       const codeStr = String(children).replace(/\n$/, '').trim();
       if (isFilenameOnly(codeStr)) return <FilenameBadge name={codeStr} />;
-      
+
       const isActuallyInline = inline || (!codeStr.includes('\n') && codeStr.length < 50);
-      
+
       if (!isActuallyInline) {
         return (
           <div className="relative group my-4 rounded-xl overflow-hidden border border-border bg-[#0a0a0a]">
@@ -267,8 +315,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {msg.role === 'user' ? <User size={15} /> : <Bot size={15} className="text-accent" />}
                   </div>
                   <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${msg.role === 'user'
-                      ? 'bg-accent text-white rounded-tr-md'
-                      : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
+                    ? 'bg-accent text-white rounded-tr-md'
+                    : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
                     }`}>
                     {msg.role === 'agent' ? (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -367,10 +415,36 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <AtSign size={10} /> Mention Document
                 </div>
                 <div className="max-h-40 overflow-y-auto custom-scrollbar">
-                  {filteredDocs.map(doc => (
+                  {filteredDocs.map((doc, idx) => (
                     <button key={doc.id} onMouseDown={e => { e.preventDefault(); insertMention(doc); }}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold hover:bg-accent hover:text-white transition-colors">
+                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold transition-colors ${idx === selectedIndex
+                        ? 'bg-accent text-white font-black'
+                        : 'hover:bg-accent hover:text-white'
+                        }`}>
                       <FileText size={13} className="shrink-0" /><span className="truncate">{doc.filename}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showSlashCommands && filteredSlashCommands.length > 0 && (
+              <div className="absolute bottom-full left-0 mb-2 w-80 max-w-full bg-card border border-border rounded-xl shadow-2xl overflow-hidden z-50 animate-in slide-in-from-bottom-2">
+                <div className="px-3 py-2 bg-muted/40 border-b border-border text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                  <Terminal size={10} className="text-accent" /> Slash Commands
+                </div>
+                <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                  {filteredSlashCommands.map((cmd, idx) => (
+                    <button key={cmd.name} onMouseDown={e => { e.preventDefault(); insertSlashCommand(cmd); }}
+                      className={`w-full flex flex-col items-start px-4 py-2 group transition-colors text-left ${idx === selectedIndex
+                        ? 'bg-accent text-white'
+                        : 'hover:bg-accent hover:text-white'
+                        }`}>
+                      <div className="flex items-center gap-1.5 text-sm font-black">
+                        <Code size={13} className={`shrink-0 ${idx === selectedIndex ? 'text-white' : 'text-accent group-hover:text-white'}`} />
+                        <span className={idx === selectedIndex ? 'text-white' : 'text-accent group-hover:text-white'}>/{cmd.name}</span>
+                      </div>
+                      <span className={`text-[11px] line-clamp-1 mt-0.5 ${idx === selectedIndex ? 'text-white/80' : 'text-muted-foreground group-hover:text-white/80'}`}>{cmd.description}</span>
                     </button>
                   ))}
                 </div>
@@ -397,7 +471,35 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 className="relative z-10 block w-full min-h-[56px] max-h-[240px] resize-none overflow-y-auto rounded-[32px] border border-border bg-muted/30 backdrop-blur-md pl-16 py-[16px] pr-16 text-[15px] leading-6 shadow-2xl transition-all placeholder:text-muted-foreground/40 focus:border-accent focus:bg-background focus:outline-none custom-scrollbar"
                 disabled={isThinking}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
+                  if (showSlashCommands && filteredSlashCommands.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setSelectedIndex(prev => (prev + 1) % filteredSlashCommands.length);
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setSelectedIndex(prev => (prev - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      insertSlashCommand(filteredSlashCommands[selectedIndex]);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setShowSlashCommands(false);
+                    }
+                  } else if (showMentions && filteredDocs.length > 0) {
+                    if (e.key === 'ArrowDown') {
+                      e.preventDefault();
+                      setSelectedIndex(prev => (prev + 1) % filteredDocs.length);
+                    } else if (e.key === 'ArrowUp') {
+                      e.preventDefault();
+                      setSelectedIndex(prev => (prev - 1 + filteredDocs.length) % filteredDocs.length);
+                    } else if (e.key === 'Enter') {
+                      e.preventDefault();
+                      insertMention(filteredDocs[selectedIndex]);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      setShowMentions(false);
+                    }
+                  } else if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     handleSend();
                   }
@@ -406,8 +508,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
               <button type="submit" disabled={(!inputText.trim() && !quotedText) || isThinking}
                 className={`absolute right-2 bottom-2 z-20 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${(inputText.trim() || quotedText) && !isThinking
-                    ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
-                    : 'bg-muted text-muted-foreground'
+                  ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
+                  : 'bg-muted text-muted-foreground'
                   }`}>
                 <Send size={18} />
               </button>

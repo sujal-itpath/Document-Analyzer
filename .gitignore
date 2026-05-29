@@ -45,3 +45,13 @@ htmlcov/
 *.key
 
 uploads/
+
+# Data files
+bm25_corpus.json
+knowledge_graph.json
+memory.sqlite
+app_data.db
+app_v2.db
+chroma_db/
+chroma_db_v2/
+chroma_memory_db/

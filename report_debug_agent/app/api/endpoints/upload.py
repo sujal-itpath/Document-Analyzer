@@ -1,6 +1,7 @@
 import os
 import shutil
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
+from typing import Optional
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -20,6 +21,7 @@ async def upload_documents(
     background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...), 
     overwrite: str = Form("true"),
+    project_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -48,13 +50,15 @@ async def upload_documents(
             # Save to DB (or update if overwrite is true)
             if existing_doc and is_overwrite:
                 db_doc = existing_doc
+                db_doc.project_id = project_id
                 # Remove old chunks from vector store before re-indexing
                 delete_from_stores(file_path)
             else:
                 db_doc = DBDocument(
                     filename=file.filename,
                     file_path=file_path,
-                    owner_id=current_user.id
+                    owner_id=current_user.id,
+                    project_id=project_id
                 )
                 db.add(db_doc)
             
@@ -91,6 +95,7 @@ async def sync_google_doc(
     background_tasks: BackgroundTasks,
     url: str = Form(...),
     name: str = Form(None),
+    project_id: Optional[int] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -131,7 +136,8 @@ async def sync_google_doc(
             filename=filename,
             file_path=file_path,
             owner_id=current_user.id,
-            google_doc_id=doc_id
+            google_doc_id=doc_id,
+            project_id=project_id
         )
         db.add(db_doc)
         db.commit()
@@ -170,11 +176,15 @@ async def get_google_docs_list(
 
 @router.get("/documents")
 async def get_user_documents(
+    project_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """List all documents uploaded by the current user."""
-    docs = db.query(DBDocument).filter(DBDocument.owner_id == current_user.id).order_by(DBDocument.upload_date.desc()).all()
+    query = db.query(DBDocument).filter(DBDocument.owner_id == current_user.id)
+    if project_id is not None:
+        query = query.filter(DBDocument.project_id == project_id)
+    docs = query.order_by(DBDocument.upload_date.desc()).all()
     return [
         {
             "id": d.id,
@@ -182,7 +192,8 @@ async def get_user_documents(
             "upload_date": d.upload_date,
             "summary": d.summary,
             "suggestions": d.suggestions,
-            "google_doc_id": d.google_doc_id
+            "google_doc_id": d.google_doc_id,
+            "project_id": d.project_id
         }
         for d in docs
     ]
