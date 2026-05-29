@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import TestCasesPanel, { TestCaseResponseData } from '../../components/TestCasesPanel';
 
 type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
 type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string; isDeleted?: boolean };
@@ -32,7 +33,7 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>('home');
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const { isAuthenticated, token: authToken, loading, logout, activeWorkspace, activeProject } = useAuth();
+  const { isAuthenticated, token: authToken, loading, logout } = useAuth();
   const router = useRouter();
 
   const [selectedDocs, setSelectedDocs] = useState<DocumentItem[]>([]);
@@ -52,8 +53,10 @@ export default function Dashboard() {
 
   // Split Pane State
   const [isSplitView, setIsSplitView] = useState(false);
+  const [splitViewContent, setSplitViewContent] = useState<'document' | 'testcases'>('document');
   const [splitWidth, setSplitWidth] = useState(50);
   const [activeDocumentId, setActiveDocumentId] = useState<number | undefined>(undefined);
+  const [testCasesData, setTestCasesData] = useState<TestCaseResponseData | null>(null);
 
   const handleDividerMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -76,14 +79,10 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (!loading) {
-      if (!isAuthenticated) {
-        router.push('/');
-      } else if (!activeWorkspace || !activeProject) {
-        router.push('/workspaces');
-      }
+    if (!loading && !isAuthenticated) {
+      router.push('/');
     }
-  }, [isAuthenticated, loading, router, activeWorkspace, activeProject]);
+  }, [isAuthenticated, loading, router]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -109,9 +108,9 @@ export default function Dashboard() {
   }, [currentSessionId]);
 
   const fetchAllDocs = async (): Promise<DocumentItem[]> => {
-    if (!authToken || !activeProject) return [];
+    if (!authToken) return [];
     try {
-      const res = await fetch(`http://localhost:8000/documents?project_id=${activeProject.id}`, {
+      const res = await fetch('http://localhost:8000/documents', {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -129,9 +128,9 @@ export default function Dashboard() {
   };
 
   const fetchSidebarSessions = async () => {
-    if (!authToken || !activeProject) return;
+    if (!authToken) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions?project_id=${activeProject.id}`, {
+      const res = await fetch('http://localhost:8000/sessions', {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -147,11 +146,9 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    if (authToken && activeProject) {
-      void fetchAllDocs();
-      void fetchSidebarSessions();
-    }
-  }, [authToken, activeProject]); // eslint-disable-line react-hooks/exhaustive-deps
+    void fetchAllDocs();
+    void fetchSidebarSessions();
+  }, [authToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewChat = () => {
     setCurrentSessionId(undefined);
@@ -164,6 +161,8 @@ export default function Dashboard() {
     setInputText('');
     setQuotedText(undefined);
     setIsSplitView(false);
+    setSplitViewContent('document');
+    setTestCasesData(null);
     setActiveDocumentId(undefined);
     setActiveView('doc-select');
   };
@@ -213,6 +212,8 @@ export default function Dashboard() {
       setInputText('');
       setQuotedText(undefined);
       setIsSplitView(false);
+      setSplitViewContent('document');
+      setTestCasesData(null);
       setActiveDocumentId(undefined);
       setActiveView('chat');
     } catch (err) {
@@ -310,7 +311,7 @@ export default function Dashboard() {
   };
 
   const handleUploadDocuments = async (files: FileList) => {
-    if (!authToken || files.length === 0 || !activeProject) return;
+    if (!authToken || files.length === 0) return;
 
     setIsUploadingDocuments(true);
     const formData = new FormData();
@@ -318,7 +319,6 @@ export default function Dashboard() {
       formData.append('files', files[i]);
     }
     formData.append('overwrite', 'false');
-    formData.append('project_id', activeProject.id.toString());
 
     try {
       const res = await fetch('http://localhost:8000/upload', {
@@ -358,6 +358,46 @@ export default function Dashboard() {
     }
   };
 
+  const handleGenerateTestCases = async (testType: string) => {
+    if (!authToken || selectedDocs.length === 0) return;
+    
+    setIsThinking(true);
+    try {
+      const filename = selectedDocs[0].filename;
+      const res = await fetch('http://localhost:8000/test-cases/generate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({
+          filename: filename,
+          test_type: testType,
+        }),
+      });
+
+      if (res.status === 401) {
+        logout();
+        return;
+      }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.detail || 'Failed to generate test cases');
+      }
+
+      const data = await res.json();
+      setTestCasesData(data.data);
+      setSplitViewContent('testcases');
+      setIsSplitView(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Generation failed';
+      await dialog.alert({ title: 'Test Cases Generation Failed', message, variant: 'danger' });
+    } finally {
+      setIsThinking(false);
+    }
+  };
+
   const handleSendMessage = async (e?: React.FormEvent, messageOverride?: string) => {
     e?.preventDefault();
     const rawInput = (messageOverride || inputText).trim();
@@ -385,7 +425,6 @@ export default function Dashboard() {
           question: userMessage,
           thread_id: requestSessionId,
           document_ids: requestSessionId ? [] : requestDocumentIds,
-          project_id: activeProject?.id,
         }),
       });
 
@@ -477,7 +516,6 @@ export default function Dashboard() {
           <div className="flex-1 overflow-hidden">
             <HomeView
               mode="manage"
-              projectId={activeProject?.id}
               onSelectDocuments={setSelectedDocs}
               onOpenChat={handleOpenChat}
               onDocumentDeleted={handleDocumentDeleted}
@@ -488,7 +526,6 @@ export default function Dashboard() {
         {activeView === 'integrations' && (
           <div className="flex-1 overflow-hidden">
             <IntegrationsView 
-              projectId={activeProject?.id}
               onSyncComplete={async () => {
                 const latestDocs = await fetchAllDocs();
                 setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
@@ -516,7 +553,6 @@ export default function Dashboard() {
             <div className="flex-1 overflow-hidden">
               <HomeView
                 mode="select"
-                projectId={activeProject?.id}
                 onSelectDocuments={setSelectedDocs}
                 onOpenChat={handleOpenChat}
               />
@@ -546,12 +582,26 @@ export default function Dashboard() {
                 ))}
                 <div className="ml-auto flex items-center gap-2">
                   <button
-                    onClick={() => setIsSplitView(!isSplitView)}
+                    onClick={() => {
+                      if (isSplitView && splitViewContent === 'document') setIsSplitView(false);
+                      else { setIsSplitView(true); setSplitViewContent('document'); }
+                    }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
-                      isSplitView ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'
+                      isSplitView && splitViewContent === 'document' ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'
                     }`}
                   >
-                    {isSplitView ? 'Close Split View' : 'Open Split View'}
+                    {isSplitView && splitViewContent === 'document' ? 'Close Docs' : 'View Docs'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (isSplitView && splitViewContent === 'testcases') setIsSplitView(false);
+                      else { setIsSplitView(true); setSplitViewContent('testcases'); }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                      isSplitView && splitViewContent === 'testcases' ? 'bg-accent text-white shadow-lg' : 'bg-accent/10 text-accent hover:bg-accent/20'
+                    }`}
+                  >
+                    {isSplitView && splitViewContent === 'testcases' ? 'Close Tests' : 'View Tests'}
                   </button>
                   <label className={`cursor-pointer text-[10px] font-black uppercase tracking-widest transition-colors ${isUploadingDocuments ? 'text-muted-foreground/50' : 'text-muted-foreground hover:text-accent'}`}>
                     <input 
@@ -578,12 +628,20 @@ export default function Dashboard() {
               {isSplitView && (
                 <>
                   <div style={{ width: `${splitWidth}%` }} className="h-full border-r border-border overflow-hidden bg-background">
-                    <DocumentViewer
-                      documents={selectedDocs}
-                      activeDocumentId={activeDocumentId}
-                      onDocumentChange={setActiveDocumentId}
-                      onQuoteSelect={setQuotedText}
-                    />
+                    {splitViewContent === 'document' ? (
+                      <DocumentViewer
+                        documents={selectedDocs}
+                        activeDocumentId={activeDocumentId}
+                        onDocumentChange={setActiveDocumentId}
+                        onQuoteSelect={setQuotedText}
+                      />
+                    ) : (
+                      <TestCasesPanel 
+                        documents={selectedDocs}
+                        testCasesData={testCasesData}
+                        onGenerateTestCases={undefined}
+                      />
+                    )}
                   </div>
                   <div 
                     onMouseDown={handleDividerMouseDown}
@@ -608,6 +666,7 @@ export default function Dashboard() {
               quotedText={quotedText}
               onClearQuote={() => setQuotedText(undefined)}
               warningMessage={warningMessage}
+              onGenerateTestCases={handleGenerateTestCases}
               onDocumentSelect={(doc) => {
                 setSelectedDocs(prev => {
                   if (prev.find(existing => existing.id === doc.id)) {

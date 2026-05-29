@@ -118,6 +118,32 @@ class UserMemoryFact(Base):
     user = relationship("User")
 
 
+class TestCaseRun(Base):
+    __tablename__ = "test_case_runs"
+    id = Column(Integer, primary_key=True, index=True)
+    filename = Column(String, index=True)
+    test_type = Column(String)
+    total_cases = Column(Integer)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+
+    records = relationship("TestCaseRecord", back_populates="run", cascade="all, delete-orphan")
+
+class TestCaseRecord(Base):
+    __tablename__ = "test_case_records"
+    id = Column(Integer, primary_key=True, index=True)
+    run_id = Column(Integer, ForeignKey("test_case_runs.id"))
+    tc_id = Column(String)  # TC_001
+    module_name = Column(String)
+    title = Column(String)
+    type = Column(String)
+    priority = Column(String)
+    tags = Column(String) # JSON string of tags
+    linked_requirement = Column(String, nullable=True)
+    acceptance_criteria = Column(String) # JSON string
+    
+    run = relationship("TestCaseRun", back_populates="records")
+
 def init_db():
     Base.metadata.create_all(bind=engine)
     _ensure_chat_session_columns()

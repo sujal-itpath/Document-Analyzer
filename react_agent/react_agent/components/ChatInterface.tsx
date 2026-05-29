@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Send, User, Bot, Copy, Check, Trash2, FileText, Plus,
-  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle, Code, Terminal
+  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -28,6 +28,7 @@ interface ChatInterfaceProps {
   onClearQuote?: () => void;
   /** Notification to show (e.g. "Document X was removed"). Auto-dismisses. */
   warningMessage?: string;
+  onGenerateTestCases?: (testType: string) => void;
 }
 
 const isFilenameOnly = (s: string) =>
@@ -70,7 +71,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages, inputText, setInputText, isThinking,
   onSendMessage, onClearChat, mode, availableDocuments, onDocumentSelect, selectedDocs = [],
   onUploadDocuments, isUploadingDocuments = false,
-  quotedText, onClearQuote, warningMessage,
+  quotedText, onClearQuote, warningMessage, onGenerateTestCases
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -89,6 +90,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [showWarning, setShowWarning] = useState(false);
   const [warningText, setWarningText] = useState('');
   const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [testType, setTestType] = useState('Manual');
 
   // ── Warning banner ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -295,7 +297,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   ? 'Ask anything — summaries, details, or specific sections.'
                   : 'Ask me to compare, summarize, or find differences.'}
               </p>
-              {onUploadDocuments && selectedDocs.length === 0 && (
+              {onUploadDocuments && (
                 <>
                   <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
                   <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}
@@ -315,8 +317,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                     {msg.role === 'user' ? <User size={15} /> : <Bot size={15} className="text-accent" />}
                   </div>
                   <div className={`min-w-0 overflow-hidden rounded-2xl px-5 py-4 text-[14px] leading-7 shadow-sm ${msg.role === 'user'
-                    ? 'bg-accent text-white rounded-tr-md'
-                    : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
+                      ? 'bg-accent text-white rounded-tr-md'
+                      : 'bg-card/95 text-foreground border border-border rounded-tl-md markdown-content'
                     }`}>
                     {msg.role === 'agent' ? (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
@@ -367,17 +369,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           )}
 
-          {/* ── Suggestions bar ── */}
-          {/* {!isThinking && suggestions.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-2 animate-in fade-in duration-300">
-              {suggestions.map((s, i) => (
-                <button key={i} onClick={() => { setInputText(s); inputRef.current?.focus(); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0">
-                  <Sparkles size={10} className="text-accent" />{s}
-                </button>
-              ))}
+          {/* ── Test Cases Generate bar ── */}
+          {onGenerateTestCases && selectedDocs.length > 0 && !isThinking && (
+            <div className="flex flex-wrap items-center justify-end gap-2 animate-in fade-in duration-300">
+              <select 
+                value={testType} 
+                onChange={(e) => setTestType(e.target.value)}
+                className="bg-card border border-border rounded-xl px-3 py-1.5 text-xs font-bold focus:border-accent focus:outline-none"
+              >
+                <option value="Manual">Manual</option>
+                <option value="API">API</option>
+                <option value="Smoke">Smoke</option>
+                <option value="Regression">Regression</option>
+                <option value="All">All</option>
+              </select>
+              <button onClick={() => onGenerateTestCases(testType)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0 text-accent">
+                <Sparkles size={12} /> Generate Test Cases
+              </button>
             </div>
-          )} */}
+          )}
 
           {/* ── Quoted text reply card ── */}
           {quotedText && (
@@ -415,12 +426,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <AtSign size={10} /> Mention Document
                 </div>
                 <div className="max-h-40 overflow-y-auto custom-scrollbar">
-                  {filteredDocs.map((doc, idx) => (
+                  {filteredDocs.map(doc => (
                     <button key={doc.id} onMouseDown={e => { e.preventDefault(); insertMention(doc); }}
-                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold transition-colors ${idx === selectedIndex
-                        ? 'bg-accent text-white font-black'
-                        : 'hover:bg-accent hover:text-white'
-                        }`}>
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm font-bold hover:bg-accent hover:text-white transition-colors">
                       <FileText size={13} className="shrink-0" /><span className="truncate">{doc.filename}</span>
                     </button>
                   ))}
@@ -508,8 +516,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
               <button type="submit" disabled={(!inputText.trim() && !quotedText) || isThinking}
                 className={`absolute right-2 bottom-2 z-20 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${(inputText.trim() || quotedText) && !isThinking
-                  ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
-                  : 'bg-muted text-muted-foreground'
+                    ? 'bg-accent text-white shadow-lg shadow-accent/20 hover:scale-105 active:scale-95'
+                    : 'bg-muted text-muted-foreground'
                   }`}>
                 <Send size={18} />
               </button>
