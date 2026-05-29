@@ -34,11 +34,11 @@ const isFilenameOnly = (s: string) =>
   !s.includes('\n') && /^[\w\s\-_()\[\].,]+\.[a-zA-Z0-9]{2,6}$/.test(s.trim());
 
 const renderUserMessage = (content: string) => {
-  const parts = content.split(/(@[\w.-]+)/g);
+  const parts = content.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
   return (
     <span className="whitespace-pre-wrap">
       {parts.map((part, i) =>
-        /^@[\w.-]+$/.test(part) ? (
+        part.startsWith('@') && isFilenameOnly(part.slice(1)) ? (
           <span key={i} className="text-white font-bold bg-white/20 px-1.5 py-0.5 rounded-md inline-flex items-center gap-1 mx-0.5 shadow-sm">
             <FileText size={12} />{part.slice(1)}
           </span>
@@ -121,6 +121,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setInputText(value);
+    
+    // Check if any tagged document was removed from the text
+    setTaggedDocs(prev => prev.filter(doc => value.includes(`@${doc.filename}`)));
+    
     const m = value.match(/@(\w*)$/);
     setShowMentions(!!m);
     setMentionFilter(m ? m[1].toLowerCase() : '');
@@ -167,10 +171,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const mdComponents: any = {
     p: ({ children }: any) => {
       if (typeof children === 'string') {
-        const parts = children.split(/(@[\w.]+)/g);
+        const parts = children.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
         return <div className="mb-3 last:mb-0">{parts.map((p: string, i: number) =>
-          /^@[\w.]+$/.test(p)
-            ? <span key={i} className="text-blue-400 font-bold bg-blue-500/10 px-1 rounded">{p}</span>
+          p.startsWith('@') && isFilenameOnly(p.slice(1))
+            ? <span key={i} className="text-blue-400 font-bold bg-blue-500/10 px-1 rounded inline-flex items-center gap-1"><FileText size={11} className="inline"/> {p}</span>
             : p
         )}</div>;
       }
@@ -198,7 +202,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       const langMatch = /language-(\w+)/.exec(className || '');
       const codeStr = String(children).replace(/\n$/, '').trim();
       if (isFilenameOnly(codeStr)) return <FilenameBadge name={codeStr} />;
-      if (!inline) {
+      
+      const isActuallyInline = inline || (!codeStr.includes('\n') && codeStr.length < 50);
+      
+      if (!isActuallyInline) {
         return (
           <div className="relative group my-4 rounded-xl overflow-hidden border border-border bg-[#0a0a0a]">
             <div className="flex items-center justify-between px-4 py-2 bg-white/5 border-b border-white/5">
@@ -240,7 +247,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   ? 'Ask anything — summaries, details, or specific sections.'
                   : 'Ask me to compare, summarize, or find differences.'}
               </p>
-              {onUploadDocuments && (
+              {onUploadDocuments && selectedDocs.length === 0 && (
                 <>
                   <input ref={uploadInputRef} type="file" className="hidden" multiple accept=".pdf,.txt,.docx,.csv,.md" onChange={handleInlineUpload} disabled={isUploadingDocuments} />
                   <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={isUploadingDocuments}

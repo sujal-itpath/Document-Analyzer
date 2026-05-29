@@ -27,5 +27,7 @@ sqlalchemy
 aiosqlite
 rank-bm25
 spacy
-numpy
-chromadb
+ zchromadb
+email_validator
+google-api-python-client
+google_auth_oauthlib
