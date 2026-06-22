@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
@@ -293,45 +293,60 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
         )}
 
         {/* ── Renderers ── */}
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-accent" size={28} />
-          </div>
-        ) : isPDF ? (
-          <Document
-            file={pdfFile}
-            onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-            loading={<div className="flex items-center justify-center h-full"><Loader2 className="animate-spin text-accent mt-10" /></div>}
-            className="flex flex-col items-center"
-          >
-            {Array.from({ length: numPages || 0 }, (_, index) => (
-              <div key={`page_${index + 1}`} className="mb-6 shadow-2xl bg-white relative">
-                <Page
-                  pageNumber={index + 1}
-                  renderTextLayer={true}
-                  renderAnnotationLayer={true}
-                  scale={1.2}
-                />
+        {useMemo(() => {
+          if (isLoading) {
+            return (
+              <div className="flex items-center justify-center h-full w-full">
+                <Loader2 className="animate-spin text-accent" size={28} />
               </div>
-            ))}
-          </Document>
-        ) : isDocx ? (
-          <div
-            className="w-full h-fit bg-white text-black p-8 rounded-xl shadow-2xl document-html-viewer prose max-w-none select-text selection:bg-accent/30 selection:text-black"
-            dangerouslySetInnerHTML={{ __html: docxHtml }}
-          />
-        ) : isTxt && txtContent ? (
-          <PlainTextRenderer content={txtContent} />
-        ) : blobUrl ? (
-          <iframe
-            src={blobUrl}
-            className="w-full h-full bg-white rounded-xl shadow-2xl border border-border"
-          />
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="animate-spin text-accent" />
-          </div>
-        )}
+            );
+          }
+          if (isPDF) {
+            return (
+              <Document
+                file={pdfFile}
+                onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                loading={<div className="flex items-center justify-center h-full w-full"><Loader2 className="animate-spin text-accent mt-10" /></div>}
+                className="flex flex-col items-center w-full"
+              >
+                {Array.from({ length: numPages || 0 }, (_, index) => (
+                  <div key={`page_${index + 1}`} className="mb-6 shadow-2xl bg-white relative">
+                    <Page
+                      pageNumber={index + 1}
+                      renderTextLayer={true}
+                      renderAnnotationLayer={true}
+                      scale={1.2}
+                    />
+                  </div>
+                ))}
+              </Document>
+            );
+          }
+          if (isDocx) {
+            return (
+              <div
+                className="w-full h-fit bg-white text-black p-8 rounded-xl shadow-2xl document-html-viewer prose max-w-none select-text selection:bg-accent/30 selection:text-black"
+                dangerouslySetInnerHTML={{ __html: docxHtml }}
+              />
+            );
+          }
+          if (isTxt && txtContent) {
+            return <PlainTextRenderer content={txtContent} />;
+          }
+          if (blobUrl) {
+            return (
+              <iframe
+                src={blobUrl}
+                className="w-full h-full bg-white rounded-xl shadow-2xl border border-border"
+              />
+            );
+          }
+          return (
+            <div className="flex items-center justify-center h-full w-full">
+              <Loader2 className="animate-spin text-accent" />
+            </div>
+          );
+        }, [isLoading, isPDF, pdfFile, numPages, isDocx, docxHtml, isTxt, txtContent, blobUrl])}
       </div>
     </div>
   );

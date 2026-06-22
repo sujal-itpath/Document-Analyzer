@@ -33,6 +33,34 @@ interface ChatInterfaceProps {
 const isFilenameOnly = (s: string) =>
   !s.includes('\n') && /^[\w\s\-_()\[\].,]+\.[a-zA-Z0-9]{2,6}$/.test(s.trim());
 
+const processTextNodes = (text: string) => {
+  // Split by [ToolName] or [ToolName: ...] tool calls
+  const parts1 = text.split(/(\[[A-Z][a-zA-Z0-9\s_]+(?::[^\]]*)?\])/g);
+  return parts1.map((p1, i) => {
+    if (/^\[[A-Z][a-zA-Z0-9\s_]+(?::[^\]]*)?\]$/.test(p1)) {
+      return <span key={`tool-${i}`} className="text-purple-400 font-black bg-purple-500/10 px-1.5 py-0.5 rounded border border-purple-500/20 mx-0.5 text-xs shadow-sm inline-flex items-center gap-1"><Terminal size={12} className="shrink-0" />{p1}</span>;
+    }
+    // Split by @filename
+    const parts2 = p1.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
+    return parts2.map((p2, j) => {
+      if (p2.startsWith('@') && isFilenameOnly(p2.slice(1))) {
+        return <span key={`file-${i}-${j}`} className="text-blue-400 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded inline-flex items-center gap-1 border border-blue-500/20 mx-0.5 shadow-sm whitespace-nowrap"><FileText size={11} className="inline shrink-0" /> {p2.slice(1)}</span>;
+      }
+      return p2;
+    });
+  });
+};
+
+const processChildren = (children: any): any => {
+  if (typeof children === 'string') return processTextNodes(children);
+  if (Array.isArray(children)) return children.map((c, i) => <React.Fragment key={i}>{processChildren(c)}</React.Fragment>);
+  if (React.isValidElement(children)) {
+    // @ts-ignore
+    return React.cloneElement(children, { ...children.props, children: processChildren(children.props.children) });
+  }
+  return children;
+};
+
 const renderUserMessage = (content: string) => {
   const parts = content.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
   return (
@@ -81,6 +109,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [taggedDocs, setTaggedDocs] = useState<DocumentItem[]>([]);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   // Reset selected suggestion index when filters or dropdown states change
   useEffect(() => {
@@ -167,9 +196,39 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     requestAnimationFrame(resizeInput);
   };
 
+  const handleScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (overlayRef.current) {
+      overlayRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  }, []);
+
   useEffect(() => {
     resizeInput();
   }, [inputText, resizeInput]);
+
+  const highlightInputText = (text: string) => {
+    const parts = text.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6}|\[[A-Z][a-zA-Z0-9\s_]+(?::[^\]]*)?\]|\/[a-z0-9\-]+)/g);
+    return (
+      <>
+        {parts.map((part, i) => {
+          if (part.startsWith('@') && isFilenameOnly(part.slice(1))) {
+            return <span key={i} className="text-blue-500 bg-blue-500/10 rounded">{part}</span>;
+          }
+          if (/^\[[A-Z][a-zA-Z0-9\s_]+(?::[^\]]*)?\]$/.test(part)) {
+            return <span key={i} className="text-purple-500 bg-purple-500/10 rounded font-black">{part}</span>;
+          }
+          if (part.startsWith('/')) {
+            const cmdName = part.slice(1).split(' ')[0];
+            if (SLASH_COMMANDS.some(c => c.name === cmdName || part.slice(1) === c.name)) {
+              return <span key={i} className="text-accent bg-accent/10 rounded font-bold">{part}</span>;
+            }
+          }
+          return <span key={i} className="text-foreground">{part}</span>;
+        })}
+        {text.endsWith('\n') && <br />}
+      </>
+    );
+  };
 
   const insertMention = useCallback((doc: DocumentItem) => {
     setInputText(inputText.replace(/@(\w*)$/, `@${doc.filename} `));
@@ -218,19 +277,11 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   const mdComponents: any = {
     p: ({ children }: any) => {
-      if (typeof children === 'string') {
-        const parts = children.split(/(@[\w\s\-_()\[\].,]+?\.[a-zA-Z0-9]{2,6})/g);
-        return <div className="mb-3 last:mb-0">{parts.map((p: string, i: number) =>
-          p.startsWith('@') && isFilenameOnly(p.slice(1))
-            ? <span key={i} className="text-blue-400 font-bold bg-blue-500/10 px-1 rounded inline-flex items-center gap-1"><FileText size={11} className="inline" /> {p}</span>
-            : p
-        )}</div>;
-      }
-      return <div className="mb-3 last:mb-0">{children}</div>;
+      return <div className="mb-3 last:mb-0 leading-7">{processChildren(children)}</div>;
     },
     strong: ({ children }: any) => <strong className="font-black">{children}</strong>,
     ol: ({ children }: any) => <ol className="list-decimal ml-5 mb-3 space-y-1">{children}</ol>,
-    li: ({ children }: any) => <li className="text-foreground/90">{children}</li>,
+    li: ({ children }: any) => <li className="text-foreground/90">{processChildren(children)}</li>,
     h1: ({ children }: any) => <h1 className="text-2xl font-black mb-3 mt-2">{children}</h1>,
     h2: ({ children }: any) => <h2 className="text-xl font-black mb-2 mt-2">{children}</h2>,
     h3: ({ children }: any) => <h3 className="text-lg font-black mb-2">{children}</h3>,
@@ -367,18 +418,6 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
             </div>
           )}
 
-          {/* ── Suggestions bar ── */}
-          {/* {!isThinking && suggestions.length > 0 && (
-            <div className="flex flex-wrap justify-center gap-2 animate-in fade-in duration-300">
-              {suggestions.map((s, i) => (
-                <button key={i} onClick={() => { setInputText(s); inputRef.current?.focus(); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-card border border-border hover:border-accent hover:bg-accent/5 rounded-xl text-xs font-bold transition-all hover:-translate-y-0.5 active:translate-y-0">
-                  <Sparkles size={10} className="text-accent" />{s}
-                </button>
-              ))}
-            </div>
-          )} */}
-
           {/* ── Quoted text reply card ── */}
           {quotedText && (
             <div className="flex items-start gap-2 bg-accent/5 border-l-4 border-accent rounded-r-2xl px-4 py-2.5 animate-in slide-in-from-bottom-2 duration-200">
@@ -451,7 +490,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleSend} className="relative group w-full">
+            <form onSubmit={handleSend} className="relative group w-full flex">
               <div className="absolute -inset-0.5 bg-accent/20 rounded-[32px] blur opacity-0 group-focus-within:opacity-100 transition-opacity duration-500" />
 
               {onUploadDocuments && (
@@ -464,47 +503,58 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </>
               )}
 
-              <textarea
-                ref={inputRef} value={inputText} onChange={handleInputChange}
-                placeholder="Ask anything… (@ to mention a document)"
-                rows={1}
-                className="relative z-10 block w-full min-h-[56px] max-h-[240px] resize-none overflow-y-auto rounded-[32px] border border-border bg-muted/30 backdrop-blur-md pl-16 py-[16px] pr-16 text-[15px] leading-6 shadow-2xl transition-all placeholder:text-muted-foreground/40 focus:border-accent focus:bg-background focus:outline-none custom-scrollbar"
-                disabled={isThinking}
-                onKeyDown={(e) => {
-                  if (showSlashCommands && filteredSlashCommands.length > 0) {
-                    if (e.key === 'ArrowDown') {
+              <div className="relative w-full rounded-[32px] border border-border bg-muted/30 backdrop-blur-md shadow-2xl transition-all focus-within:border-accent focus-within:bg-background">
+                {/* Backdrop overlay for highlights */}
+                <div
+                  ref={overlayRef}
+                  className="absolute inset-0 pl-16 py-[16px] pr-16 text-[15px] leading-6 whitespace-pre-wrap break-words pointer-events-none overflow-hidden [&::-webkit-scrollbar]:hidden"
+                  aria-hidden="true"
+                >
+                  {highlightInputText(inputText)}
+                </div>
+                {/* Transparent Textarea */}
+                <textarea
+                  ref={inputRef} value={inputText} onChange={handleInputChange} onScroll={handleScroll}
+                  placeholder="Ask anything… (@ to mention a document)"
+                  rows={1}
+                  className="relative z-10 block w-full min-h-[56px] max-h-[240px] resize-none overflow-y-auto bg-transparent pl-16 py-[16px] pr-16 text-[15px] leading-6 text-transparent caret-foreground focus:outline-none custom-scrollbar placeholder:text-muted-foreground/40"
+                  disabled={isThinking}
+                  onKeyDown={(e) => {
+                    if (showSlashCommands && filteredSlashCommands.length > 0) {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedIndex(prev => (prev + 1) % filteredSlashCommands.length);
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedIndex(prev => (prev - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        insertSlashCommand(filteredSlashCommands[selectedIndex]);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setShowSlashCommands(false);
+                      }
+                    } else if (showMentions && filteredDocs.length > 0) {
+                      if (e.key === 'ArrowDown') {
+                        e.preventDefault();
+                        setSelectedIndex(prev => (prev + 1) % filteredDocs.length);
+                      } else if (e.key === 'ArrowUp') {
+                        e.preventDefault();
+                        setSelectedIndex(prev => (prev - 1 + filteredDocs.length) % filteredDocs.length);
+                      } else if (e.key === 'Enter') {
+                        e.preventDefault();
+                        insertMention(filteredDocs[selectedIndex]);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setShowMentions(false);
+                      }
+                    } else if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
-                      setSelectedIndex(prev => (prev + 1) % filteredSlashCommands.length);
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setSelectedIndex(prev => (prev - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      insertSlashCommand(filteredSlashCommands[selectedIndex]);
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setShowSlashCommands(false);
+                      handleSend();
                     }
-                  } else if (showMentions && filteredDocs.length > 0) {
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setSelectedIndex(prev => (prev + 1) % filteredDocs.length);
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setSelectedIndex(prev => (prev - 1 + filteredDocs.length) % filteredDocs.length);
-                    } else if (e.key === 'Enter') {
-                      e.preventDefault();
-                      insertMention(filteredDocs[selectedIndex]);
-                    } else if (e.key === 'Escape') {
-                      e.preventDefault();
-                      setShowMentions(false);
-                    }
-                  } else if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
 
               <button type="submit" disabled={(!inputText.trim() && !quotedText) || isThinking}
                 className={`absolute right-2 bottom-2 z-20 flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 ${(inputText.trim() || quotedText) && !isThinking

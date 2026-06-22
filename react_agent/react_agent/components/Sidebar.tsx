@@ -5,6 +5,7 @@ import {
   FileText, Database, Home, Pin, Moon, Sun, Folder
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { useRouter } from 'next/navigation';
 
 interface Session {
@@ -54,6 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   onNewChat,
 }) => {
   const { logout, user, updateProfile, activeWorkspace, activeProject } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const router = useRouter();
 
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -62,7 +64,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   const [renameText, setRenameText] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
   const [pinnedSessions, setPinnedSessions] = useState<string[]>([]);
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const menuRef = useRef<HTMLDivElement>(null);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -83,10 +84,6 @@ const Sidebar: React.FC<SidebarProps> = ({
   useEffect(() => {
     const savedPins = localStorage.getItem('pinned_sessions');
     if (savedPins) setPinnedSessions(JSON.parse(savedPins));
-
-    const savedTheme = localStorage.getItem('app_theme') || 'dark';
-    setTheme(savedTheme as 'dark' | 'light');
-    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
   const handleTogglePin = (id: string, e: React.MouseEvent) => {
@@ -97,13 +94,6 @@ const Sidebar: React.FC<SidebarProps> = ({
       return newPins;
     });
     setActiveMenuId(null);
-  };
-
-  const handleToggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
-    localStorage.setItem('app_theme', newTheme);
-    document.documentElement.setAttribute('data-theme', newTheme);
   };
 
   const handleSaveProfile = (e: React.FormEvent) => {
@@ -262,19 +252,19 @@ const Sidebar: React.FC<SidebarProps> = ({
             {isOpen && <span className="font-bold text-sm">Documents</span>}
           </button>
 
-          {/* Integrations link */}
+          {/* Connectors link */}
           <button
             onClick={() => setActiveView('integrations')}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeView === 'integrations'
               ? 'bg-accent text-white shadow-lg shadow-accent/20'
               : 'hover:bg-muted text-muted-foreground hover:text-foreground'
               }`}
-            title={!isOpen ? 'Integrations' : undefined}
+            title={!isOpen ? 'Connectors' : undefined}
           >
             <div className="flex-shrink-0 relative w-4 h-4 ml-0.5">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
             </div>
-            {isOpen && <span className="font-bold text-sm">Integrations</span>}
+            {isOpen && <span className="font-bold text-sm">Connectors</span>}
           </button>
 
           {/* Divider */}
@@ -434,8 +424,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         {/* Footer */}
         <div className="p-3 border-t border-border flex-shrink-0 space-y-1">
           <button
-            onClick={handleToggleTheme}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-all"
+            onClick={toggleTheme}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-all ${!isOpen ? 'justify-center' : ''}`}
             title={!isOpen ? 'Toggle Theme' : undefined}
           >
             {theme === 'dark' ? <Sun size={16} className="flex-shrink-0" /> : <Moon size={16} className="flex-shrink-0" />}

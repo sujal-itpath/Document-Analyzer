@@ -89,9 +89,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
-      if (url.searchParams.has('integration')) {
+      if (url.searchParams.has('connector')) {
         setActiveView('integrations');
-        url.searchParams.delete('integration');
+        url.searchParams.delete('connector');
         window.history.replaceState({}, '', url.toString());
       }
     }
@@ -475,26 +475,60 @@ export default function Dashboard() {
 
       <main className="flex-1 overflow-hidden flex flex-col min-w-0">
         {activeView === 'home' && (
-          <div className="flex-1 overflow-hidden">
-            <HomeView
-              mode="manage"
-              projectId={activeProject?.id}
-              onSelectDocuments={setSelectedDocs}
-              onOpenChat={handleOpenChat}
-              onDocumentDeleted={handleDocumentDeleted}
-            />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-card/50 flex-shrink-0">
+              <button
+                onClick={() => router.push('/workspaces?step=projects')}
+                className="p-2 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+                title="Back to Projects"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-black text-lg">Documents</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Manage and view your workspace documents
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <HomeView
+                mode="manage"
+                projectId={activeProject?.id}
+                onSelectDocuments={setSelectedDocs}
+                onOpenChat={handleOpenChat}
+                onDocumentDeleted={handleDocumentDeleted}
+              />
+            </div>
           </div>
         )}
 
         {activeView === 'integrations' && (
-          <div className="flex-1 overflow-hidden">
-            <IntegrationsView 
-              projectId={activeProject?.id}
-              onSyncComplete={async () => {
-                const latestDocs = await fetchAllDocs();
-                setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
-              }}
-            />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-card/50 flex-shrink-0">
+              <button
+                onClick={() => setActiveView('home')}
+                className="p-2 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+                title="Back to Documents"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-black text-lg">Connectors</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Connect third-party apps to sync documents
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <IntegrationsView 
+                projectId={activeProject?.id}
+                onSyncComplete={async () => {
+                  const latestDocs = await fetchAllDocs();
+                  setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -529,6 +563,13 @@ export default function Dashboard() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {selectedDocs.length > 0 && (
               <div className="px-6 py-2.5 border-b border-border bg-card/40 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <button
+                  onClick={() => setActiveView('home')}
+                  className="p-1.5 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground mr-1"
+                  title="Back to Documents"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">
                   Context
                 </span>
