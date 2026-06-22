@@ -26,7 +26,7 @@ SCOPES = [
 
 # Provide fallback for credentials if not yet set
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1" # For local dev over HTTP
-
+os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1" # Allow scopes to be changed by Google without throwing exception
 def get_google_client_config():
     client_id = os.getenv("GOOGLE_CLIENT_ID", "YOUR_GOOGLE_CLIENT_ID")
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "YOUR_GOOGLE_CLIENT_SECRET")

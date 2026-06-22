@@ -172,6 +172,8 @@ async def get_google_docs_list(
         docs = list_google_docs(current_user.id)
         return {"documents": docs}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to list Google Docs: {str(e)}")
 
 @router.get("/documents")
