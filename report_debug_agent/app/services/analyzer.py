@@ -1,7 +1,10 @@
 import json
+import logging
 from langchain_ollama import OllamaLLM
 from app.core.config import settings
 from app.db.database import SessionLocal, Document
+
+logger = logging.getLogger(__name__)
 
 class DocumentAnalyzer:
     def __init__(self):
@@ -36,8 +39,8 @@ class DocumentAnalyzer:
                         doc.summary = data.get("summary", "")
                         doc.suggestions = json.dumps(data.get("suggestions", []))
                         db.commit()
-                        print(f"Analysis complete for document {document_id}")
+                        logger.info("Analysis complete for document %s", document_id)
                 finally:
                     db.close()
         except Exception as e:
-            print(f"Analysis failed for document {document_id}: {e}")
+            logger.warning("Analysis failed for document %s: %s", document_id, e)

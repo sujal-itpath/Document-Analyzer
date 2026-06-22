@@ -312,8 +312,7 @@ async def ask_question(
                 async_db.add(agent_msg)
                 async_db.commit()
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.exception("Agent streaming failed for session %s", session_id)
             yield f"Error: {str(e)}"
         finally:
             reset_allowed_sources(token)

@@ -6,9 +6,9 @@ import {
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import type { DocumentItem } from '../lib/types';
 
 interface Message { role: 'user' | 'agent'; content: string; }
-interface Document { id: number; filename: string; summary?: string; suggestions?: string; isDeleted?: boolean; }
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -18,9 +18,9 @@ interface ChatInterfaceProps {
   onSendMessage: (e?: React.FormEvent, message?: string) => void;
   onClearChat: () => void;
   mode: 'single' | 'multi';
-  availableDocuments: Document[];
-  onDocumentSelect: (doc: Document) => void;
-  selectedDocs?: Document[];
+  availableDocuments: DocumentItem[];
+  onDocumentSelect: (doc: DocumentItem) => void;
+  selectedDocs?: DocumentItem[];
   onUploadDocuments?: (files: FileList) => Promise<void>;
   isUploadingDocuments?: boolean;
   /** Raw text to quote (set by document viewer selection). Cleared after send. */
@@ -80,7 +80,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [showSlashCommands, setShowSlashCommands] = useState(false);
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [taggedDocs, setTaggedDocs] = useState<Document[]>([]);
+  const [taggedDocs, setTaggedDocs] = useState<DocumentItem[]>([]);
 
   // Reset selected suggestion index when filters or dropdown states change
   useEffect(() => {
@@ -171,7 +171,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     resizeInput();
   }, [inputText, resizeInput]);
 
-  const insertMention = useCallback((doc: Document) => {
+  const insertMention = useCallback((doc: DocumentItem) => {
     setInputText(inputText.replace(/@(\w*)$/, `@${doc.filename} `));
     setShowMentions(false);
     if (!taggedDocs.find(d => d.id === doc.id)) {

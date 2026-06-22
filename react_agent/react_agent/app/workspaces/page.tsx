@@ -3,25 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { apiUrl, authHeaders } from '../../lib/api';
+import type { ProjectItem, WorkspaceItem } from '../../lib/types';
 import { 
   Bot, Folder, Plus, Trash2, Edit2, ArrowLeft, 
   LogOut, Loader2, Check, X, ChevronRight, FileText 
 } from 'lucide-react';
-
-type WorkspaceItem = {
-  id: number;
-  name: string;
-  description: string | null;
-  created_at: string;
-};
-
-type ProjectItem = {
-  id: number;
-  name: string;
-  description: string | null;
-  workspace_id: number;
-  created_at: string;
-};
 
 export default function WorkspacesPage() {
   const { token, logout, selectWorkspace, selectProject, loading, isAuthenticated } = useAuth();
@@ -70,8 +57,8 @@ export default function WorkspacesPage() {
     if (!token) return;
     setIsLoadingWorkspaces(true);
     try {
-      const res = await fetch('http://localhost:8000/workspaces', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(apiUrl('/workspaces'), {
+        headers: authHeaders(token)
       });
       if (res.status === 401) {
         logout();
@@ -92,8 +79,8 @@ export default function WorkspacesPage() {
     if (!token) return;
     setIsLoadingProjects(true);
     try {
-      const res = await fetch(`http://localhost:8000/workspaces/${workspaceId}/projects`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(apiUrl(`/workspaces/${workspaceId}/projects`), {
+        headers: authHeaders(token)
       });
       if (res.status === 401) {
         logout();
@@ -145,11 +132,11 @@ export default function WorkspacesPage() {
     if (!wsName.trim() || !token) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch('http://localhost:8000/workspaces', {
+      const res = await fetch(apiUrl('/workspaces'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...authHeaders(token)
         },
         body: JSON.stringify({ name: wsName.trim(), description: wsDesc.trim() })
       });
@@ -169,11 +156,11 @@ export default function WorkspacesPage() {
   const handleUpdateWorkspace = async (id: number) => {
     if (!editWsName.trim() || !token) return;
     try {
-      const res = await fetch(`http://localhost:8000/workspaces/${id}`, {
+      const res = await fetch(apiUrl(`/workspaces/${id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...authHeaders(token)
         },
         body: JSON.stringify({ name: editWsName.trim(), description: editWsDesc.trim() })
       });
@@ -189,9 +176,9 @@ export default function WorkspacesPage() {
   const handleDeleteWorkspace = async (id: number) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:8000/workspaces/${id}`, {
+      const res = await fetch(apiUrl(`/workspaces/${id}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       if (res.status === 204 || res.ok) {
         setDeletingWorkspace(null);
@@ -208,11 +195,11 @@ export default function WorkspacesPage() {
     if (!projName.trim() || !selectedWorkspace || !token) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`http://localhost:8000/workspaces/${selectedWorkspace.id}/projects`, {
+      const res = await fetch(apiUrl(`/workspaces/${selectedWorkspace.id}/projects`), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...authHeaders(token)
         },
         body: JSON.stringify({ name: projName.trim(), description: projDesc.trim() })
       });
@@ -232,11 +219,11 @@ export default function WorkspacesPage() {
   const handleUpdateProject = async (id: number) => {
     if (!editProjName.trim() || !token) return;
     try {
-      const res = await fetch(`http://localhost:8000/projects/${id}`, {
+      const res = await fetch(apiUrl(`/projects/${id}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...authHeaders(token)
         },
         body: JSON.stringify({ name: editProjName.trim(), description: editProjDesc.trim() })
       });
@@ -254,9 +241,9 @@ export default function WorkspacesPage() {
   const handleDeleteProject = async (id: number) => {
     if (!token) return;
     try {
-      const res = await fetch(`http://localhost:8000/projects/${id}`, {
+      const res = await fetch(apiUrl(`/projects/${id}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       if (res.status === 204 || res.ok) {
         setDeletingProject(null);

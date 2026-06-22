@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.database import get_db, Workspace, Project, User
 from app.api.endpoints.auth import get_current_user
+from app.services.document_cleanup import cleanup_document_artifacts
 from pydantic import BaseModel
 from typing import Optional, List
-import datetime
 
 router = APIRouter()
 
@@ -114,21 +114,9 @@ async def delete_workspace(
     if not workspace:
         raise HTTPException(status_code=404, detail="Workspace not found")
         
-    # Before deleting the workspace rows from the DB, we want to delete physical files of documents belonging to its projects
     for project in workspace.projects:
         for doc in project.documents:
-            import os
-            from rag.vector_store import delete_from_stores
-            if doc.file_path:
-                try:
-                    delete_from_stores(doc.file_path)
-                except Exception as e:
-                    print(f"Warning: could not remove index data for {doc.file_path}: {e}")
-                if os.path.exists(doc.file_path):
-                    try:
-                        os.remove(doc.file_path)
-                    except Exception as e:
-                        print(f"Warning: could not delete file {doc.file_path}: {e}")
+            cleanup_document_artifacts(doc.file_path)
     
     db.delete(workspace)
     db.commit()

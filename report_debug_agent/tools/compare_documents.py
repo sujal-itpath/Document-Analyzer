@@ -1,7 +1,10 @@
 import os
+import logging
 from langchain_core.tools import tool
 from rag.vector_store import get_retriever
 from app.services.chat_context import get_allowed_sources
+
+logger = logging.getLogger(__name__)
 
 @tool
 def compare_documents(query: str, document_names: list[str]) -> str:
@@ -48,7 +51,7 @@ def compare_documents(query: str, document_names: list[str]) -> str:
                     filter=search_filter
                 )
             except Exception as e:
-                print(f"Similarity search failed for {doc_name}: {e}")
+                logger.warning("Similarity search failed for %s: %s", doc_name, e)
                 search_results = []
             
             if not search_results:

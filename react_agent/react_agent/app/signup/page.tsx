@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Bot, Mail, Lock, Loader2, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { apiUrl } from '../../lib/api';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -18,7 +19,7 @@ export default function SignupPage() {
     setError(null);
 
     try {
-      const response = await fetch('http://localhost:8000/auth/signup', {
+      const response = await fetch(apiUrl('/auth/signup'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
@@ -31,8 +32,8 @@ export default function SignupPage() {
 
       await response.json();
       router.push('/login');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Signup failed');
     } finally {
       setIsLoading(false);
     }

@@ -1,4 +1,5 @@
 import os
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
@@ -7,10 +8,10 @@ import google.auth.transport.requests
 from google.oauth2 import id_token
 from app.db.database import get_db, User, UserIntegration
 from app.api.endpoints.auth import get_current_user
-from app.core.config import settings
 import json
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # In-memory store for PKCE code verifiers
 CODE_VERIFIERS = {}
@@ -122,7 +123,7 @@ async def google_callback(request: Request, state: str, code: str, db: Session =
     except Exception as e:
         import traceback
         error_details = traceback.format_exc()
-        print(f"Error during Google callback: {e}")
+        logger.exception("Error during Google callback: %s", e)
         with open("google_callback_error.log", "w") as f:
             f.write(error_details)
         return RedirectResponse(url="http://localhost:3000/dashboard?integration=error")

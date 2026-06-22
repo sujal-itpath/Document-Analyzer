@@ -1,9 +1,12 @@
 import os
 import pdfplumber
 import docx
+import logging
 from unstructured.partition.auto import partition
 from langchain_core.documents import Document
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 class DocumentProcessor:
     @staticmethod
@@ -62,7 +65,11 @@ class DocumentProcessor:
         # 2. If no text was found, or it's very short (likely a scanned PDF), try OCR.
         # Increased threshold to 800 characters to be safer.
         if not documents or extracted_text_length < 800:
-            print(f"Low text content ({extracted_text_length} chars). Attempting OCR for {file_path}...")
+            logger.info(
+                "Low text content (%d chars). Attempting OCR for %s.",
+                extracted_text_length,
+                file_path,
+            )
             elements = partition(filename=file_path, strategy="ocr_only")
             for el in elements:
                 documents.append(Document(

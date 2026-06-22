@@ -6,6 +6,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { FileText, Loader2, MessageSquareQuote } from 'lucide-react';
 import * as mammoth from 'mammoth/mammoth.browser';
+import { apiUrl, authHeaders } from '../lib/api';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
@@ -193,8 +194,8 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
 
     const fetchDoc = async () => {
       try {
-        const res = await fetch(`http://localhost:8000/documents/${activeDoc.id}/content`, {
-          headers: { Authorization: `Bearer ${authToken}` }
+        const res = await fetch(apiUrl(`/documents/${activeDoc.id}/content`), {
+          headers: authHeaders(authToken)
         });
         if (!res.ok) throw new Error('Failed to fetch');
 
@@ -241,8 +242,8 @@ const DocumentViewer: React.FC<DocumentViewerProps> = ({
   const isTxt = filename.endsWith('.txt') || filename.endsWith('.md') || filename.endsWith('.csv');
 
   const pdfFile = React.useMemo(() => ({
-    url: `http://localhost:8000/documents/${activeDoc.id}/content`,
-    httpHeaders: { Authorization: `Bearer ${authToken}` }
+    url: apiUrl(`/documents/${activeDoc.id}/content`),
+    httpHeaders: authHeaders(authToken)
   }), [activeDoc.id, authToken]);
 
   return (

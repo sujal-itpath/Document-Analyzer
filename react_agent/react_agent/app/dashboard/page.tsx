@@ -10,9 +10,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
+import { apiUrl, authHeaders } from '../../lib/api';
+import type { DocumentItem } from '../../lib/types';
 
 type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
-type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string; isDeleted?: boolean };
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
   messages: Array<{ role: 'user' | 'agent'; content: string; timestamp: string }>;
@@ -111,8 +112,8 @@ export default function Dashboard() {
   const fetchAllDocs = async (): Promise<DocumentItem[]> => {
     if (!authToken || !activeProject) return [];
     try {
-      const res = await fetch(`http://localhost:8000/documents?project_id=${activeProject.id}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+      const res = await fetch(apiUrl(`/documents?project_id=${activeProject.id}`), {
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -131,8 +132,8 @@ export default function Dashboard() {
   const fetchSidebarSessions = async () => {
     if (!authToken || !activeProject) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions?project_id=${activeProject.id}`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+      const res = await fetch(apiUrl(`/sessions?project_id=${activeProject.id}`), {
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -189,8 +190,8 @@ export default function Dashboard() {
     if (!authToken) return;
     setIsThinking(true);
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}/messages`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+      const res = await fetch(apiUrl(`/sessions/${sessionId}/messages`), {
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -225,9 +226,9 @@ export default function Dashboard() {
   const handleSessionDelete = async (sessionId: string) => {
     if (!authToken) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+      const res = await fetch(apiUrl(`/sessions/${sessionId}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -249,11 +250,11 @@ export default function Dashboard() {
   const handleSessionRename = async (sessionId: string, newTitle: string) => {
     if (!authToken || !newTitle.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+      const res = await fetch(apiUrl(`/sessions/${sessionId}`), {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}` 
+          ...authHeaders(authToken),
         },
         body: JSON.stringify({ title: newTitle.trim() }),
       });
@@ -296,11 +297,11 @@ export default function Dashboard() {
   const persistSessionDocuments = async (sessionId: string, docs: DocumentItem[]) => {
     if (!authToken) return;
     const uniqueIds = Array.from(new Set(docs.map(doc => doc.id)));
-    const res = await fetch(`http://localhost:8000/sessions/${sessionId}/documents`, {
+    const res = await fetch(apiUrl(`/sessions/${sessionId}/documents`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
+        ...authHeaders(authToken),
       },
       body: JSON.stringify({ document_ids: uniqueIds }),
     });
@@ -321,9 +322,9 @@ export default function Dashboard() {
     formData.append('project_id', activeProject.id.toString());
 
     try {
-      const res = await fetch('http://localhost:8000/upload', {
+      const res = await fetch(apiUrl('/upload'), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: authHeaders(authToken),
         body: formData,
       });
 
@@ -375,11 +376,11 @@ export default function Dashboard() {
     const requestDocumentIds = selectedDocs.filter(d => !d.isDeleted).map(doc => doc.id);
 
     try {
-      const res = await fetch('http://localhost:8000/ask', {
+      const res = await fetch(apiUrl('/ask'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
+          ...authHeaders(authToken),
         },
         body: JSON.stringify({
           question: userMessage,

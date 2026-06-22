@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
 import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, ChevronDown, BookOpen, GitBranch, Kanban } from 'lucide-react';
+import { apiUrl, authHeaders } from '../lib/api';
 
 interface IntegrationsViewProps {
   onSyncComplete?: () => void;
@@ -43,10 +44,10 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
   const fetchWorkspaceDocs = async () => {
     try {
       const url = projectId
-        ? `http://localhost:8000/documents?project_id=${projectId}`
-        : 'http://localhost:8000/documents';
+        ? apiUrl(`/documents?project_id=${projectId}`)
+        : apiUrl('/documents');
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       if (res.ok) {
         const data = await res.json();
@@ -62,8 +63,8 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
     setIsLoadingDocs(true);
     setDocsError(null);
     try {
-      const res = await fetch('http://localhost:8000/documents/google/list', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(apiUrl('/documents/google/list'), {
+        headers: authHeaders(token)
       });
       const data = await res.json();
       if (res.ok) {
@@ -88,8 +89,8 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
 
   const handleConnectGoogle = async () => {
     try {
-      const res = await fetch('http://localhost:8000/auth/google/login', {
-        headers: { Authorization: `Bearer ${token}` }
+      const res = await fetch(apiUrl('/auth/google/login'), {
+        headers: authHeaders(token)
       });
       const data = await res.json();
       if (res.ok && data.authorization_url) {
@@ -114,9 +115,9 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
     
     setIsDisconnecting(true);
     try {
-      const res = await fetch('http://localhost:8000/auth/google/disconnect', {
+      const res = await fetch(apiUrl('/auth/google/disconnect'), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       if (res.ok) {
         setIsConnected(false);
@@ -144,9 +145,9 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
         formData.append('project_id', projectId.toString());
       }
 
-      const res = await fetch('http://localhost:8000/documents/google', {
+      const res = await fetch(apiUrl('/documents/google'), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
         body: formData
       });
 
@@ -184,9 +185,9 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
 
     setSyncingDocId(doc.id);
     try {
-      const res = await fetch(`http://localhost:8000/documents/${workspaceDoc.id}`, {
+      const res = await fetch(apiUrl(`/documents/${workspaceDoc.id}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
 
       if (!res.ok) {

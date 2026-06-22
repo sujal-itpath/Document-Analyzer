@@ -2,19 +2,21 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { apiUrl, authHeaders } from '../lib/api';
+import type { ProjectItem, UserProfile, WorkspaceItem } from '../lib/types';
 
 interface AuthContextType {
-  user: any;
+  user: UserProfile | null;
   token: string | null;
   loading: boolean;
   login: (token: string) => void;
   logout: () => void;
   isAuthenticated: boolean;
   updateProfile: (profileData: { displayName: string; username: string; avatarColor?: string }) => void;
-  activeWorkspace: any | null;
-  activeProject: any | null;
-  selectWorkspace: (workspace: any | null) => void;
-  selectProject: (project: any | null) => void;
+  activeWorkspace: WorkspaceItem | null;
+  activeProject: ProjectItem | null;
+  selectWorkspace: (workspace: WorkspaceItem | null) => void;
+  selectProject: (project: ProjectItem | null) => void;
 }
 
 const decodeJwtEmail = (token: string): string => {
@@ -41,7 +43,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authState, setAuthState] = useState<{
     token: string | null;
-    user: any;
+    user: UserProfile | null;
     loading: boolean;
   }>({
     token: null,
@@ -49,8 +51,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     loading: true,
   });
 
-  const [activeWorkspace, setActiveWorkspaceState] = useState<any | null>(null);
-  const [activeProject, setActiveProjectState] = useState<any | null>(null);
+  const [activeWorkspace, setActiveWorkspaceState] = useState<WorkspaceItem | null>(null);
+  const [activeProject, setActiveProjectState] = useState<ProjectItem | null>(null);
   
   const router = useRouter();
 
@@ -86,10 +88,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchProfile = async () => {
       try {
-        const response = await fetch('http://localhost:8000/auth/profile', {
-          headers: {
-            'Authorization': `Bearer ${savedToken}`
-          }
+        const response = await fetch(apiUrl('/auth/profile'), {
+          headers: authHeaders(savedToken),
         });
         if (response.ok) {
           const data = await response.json();
@@ -138,10 +138,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('auth_token', newToken);
     
     try {
-      const response = await fetch('http://localhost:8000/auth/profile', {
-        headers: {
-          'Authorization': `Bearer ${newToken}`
-        }
+      const response = await fetch(apiUrl('/auth/profile'), {
+        headers: authHeaders(newToken),
       });
       if (response.ok) {
         const data = await response.json();
@@ -195,11 +193,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!savedToken) return;
 
     try {
-      const response = await fetch('http://localhost:8000/auth/profile', {
+      const response = await fetch(apiUrl('/auth/profile'), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${savedToken}`
+          ...authHeaders(savedToken),
         },
         body: JSON.stringify({
           username: profileData.username,
@@ -230,7 +228,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const selectWorkspace = useCallback((workspace: any | null) => {
+  const selectWorkspace = useCallback((workspace: WorkspaceItem | null) => {
     setActiveWorkspaceState(workspace);
     if (workspace) {
       localStorage.setItem('active_workspace', JSON.stringify(workspace));
@@ -241,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('active_project');
   }, []);
 
-  const selectProject = useCallback((project: any | null) => {
+  const selectProject = useCallback((project: ProjectItem | null) => {
     setActiveProjectState(project);
     if (project) {
       localStorage.setItem('active_project', JSON.stringify(project));
