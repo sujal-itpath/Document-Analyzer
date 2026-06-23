@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
-from langchain_ollama import OllamaEmbeddings
+
 
 from app.services.document_processor import DocumentProcessor
 from app.core.config import settings
@@ -34,11 +34,9 @@ _CHUNK_SIZE = 600
 _CHUNK_OVERLAP = 120
 
 
-def _get_embeddings() -> OllamaEmbeddings:
-    return OllamaEmbeddings(
-        base_url=settings.OLLAMA_BASE_URL,
-        model=settings.OLLAMA_EMBED_MODEL,
-    )
+def _get_embeddings():
+    from app.core.llm_factory import get_embeddings
+    return get_embeddings()
 
 
 def _split_documents(docs: List[Document], file_path: str) -> List[Document]:

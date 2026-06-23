@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from langchain_ollama import ChatOllama
+from app.core.llm_factory import get_chat_model
 from langgraph.prebuilt import create_react_agent
 from configs.tools_config import TOOLS
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -8,11 +8,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 load_dotenv()
 from app.core.config import settings
 
-llm = ChatOllama(
-    base_url=settings.OLLAMA_BASE_URL,
-    model=settings.OLLAMA_CHAT_MODEL,
-    temperature=0,
-)
+llm = get_chat_model(temperature=0)
 
 _prompt_path = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),

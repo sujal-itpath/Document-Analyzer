@@ -3,7 +3,7 @@ import uuid
 import logging
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from langchain_ollama import OllamaLLM
+from app.core.llm_factory import get_llm
 from app.core.config import settings
 from app.db.database import JiraTicketDraft, Project, Document
 from app.services.retrieval import search_docs
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class JiraAIAssistant:
     def __init__(self):
-        self.llm = OllamaLLM(model=settings.OLLAMA_CHAT_MODEL, base_url=settings.OLLAMA_BASE_URL)
+        self.llm = get_llm()
 
     def _parse_llm_json(self, response: str) -> Dict[str, Any]:
         try:

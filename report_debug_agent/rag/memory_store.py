@@ -41,12 +41,8 @@ def _get_client():
 def _get_embeddings():
     global _embeddings
     if _embeddings is None:
-        from langchain_ollama import OllamaEmbeddings
-        from app.core.config import settings
-        _embeddings = OllamaEmbeddings(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_EMBED_MODEL,
-        )
+        from app.core.llm_factory import get_embeddings
+        _embeddings = get_embeddings()
     return _embeddings
 
 
