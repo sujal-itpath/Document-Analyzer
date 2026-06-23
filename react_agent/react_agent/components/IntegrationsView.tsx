@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
 import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, Kanban, ArrowLeft, ChevronDown } from 'lucide-react';
 import { apiUrl, authHeaders } from '../lib/api';
+import JiraAssistantView from './JiraAssistantView';
 
 interface IntegrationsViewProps {
   onSyncComplete?: () => void;
@@ -29,6 +30,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
   const dialog = useDialog();
   const [docsError, setDocsError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState<boolean | null>(null);
+  const [isJiraConnected, setIsJiraConnected] = useState<boolean | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   
   const [syncingDocId, setSyncingDocId] = useState<string | null>(null);
@@ -36,8 +38,19 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
 
   const [activeConnector, setActiveConnector] = useState<string | null>(null);
 
-  const handleComingSoon = () => {
-    dialog.alert({ title: 'Coming Soon', message: 'This integration is not yet available.' });
+  const fetchJiraStatus = async () => {
+    if (!token) return;
+    try {
+      const res = await fetch(apiUrl('/jira/status'), { headers: authHeaders(token) });
+      if (res.ok) {
+        const data = await res.json();
+        setIsJiraConnected(data.connected);
+      } else {
+        setIsJiraConnected(false);
+      }
+    } catch (err) {
+      setIsJiraConnected(false);
+    }
   };
 
   const fetchWorkspaceDocs = async () => {
@@ -84,6 +97,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
   useEffect(() => {
     fetchWorkspaceDocs();
     fetchGoogleDocsList();
+    fetchJiraStatus();
   }, [token, projectId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnectGoogle = async () => {
@@ -125,6 +139,50 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
         setActiveConnector(null);
       } else {
         await dialog.alert({ title: 'Disconnect Failed', message: 'Failed to disconnect Google account', variant: 'danger' });
+      }
+    } catch (err) {
+      await dialog.alert({ title: 'Network Error', message: 'Network error trying to reach the server.', variant: 'danger' });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
+  const handleConnectJira = async () => {
+    try {
+      const res = await fetch(apiUrl('/auth/jira/login'), {
+        headers: authHeaders(token)
+      });
+      const data = await res.json();
+      if (res.ok && data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        await dialog.alert({ title: 'Connection Failed', message: data.detail || 'Failed to initialize Jira Login', variant: 'danger' });
+      }
+    } catch (err) {
+      console.error("Login redirect failed:", err);
+      await dialog.alert({ title: 'Network Error', message: 'Network error trying to reach the server.', variant: 'danger' });
+    }
+  };
+
+  const handleDisconnectJira = async () => {
+    const confirmed = await dialog.confirm({
+      title: 'Disconnect Jira Account',
+      message: 'Are you sure you want to disconnect your Jira account?',
+      confirmLabel: 'Disconnect',
+      variant: 'danger'
+    });
+    if (!confirmed) return;
+    
+    setIsDisconnecting(true);
+    try {
+      const res = await fetch(apiUrl('/auth/jira/disconnect'), {
+        method: 'DELETE',
+        headers: authHeaders(token)
+      });
+      if (res.ok) {
+        setIsJiraConnected(false);
+      } else {
+        await dialog.alert({ title: 'Disconnect Failed', message: 'Failed to disconnect Jira account', variant: 'danger' });
       }
     } catch (err) {
       await dialog.alert({ title: 'Network Error', message: 'Network error trying to reach the server.', variant: 'danger' });
@@ -203,6 +261,11 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
       setSyncingDocId(null);
     }
   };
+
+  // Jira Assistant View
+  if (activeConnector === 'jira') {
+    return <JiraAssistantView onBack={() => setActiveConnector(null)} projectId={projectId} />;
+  }
 
   // Google Docs View (Detailed list)
   if (activeConnector === 'google') {
@@ -416,7 +479,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
           </div>
 
           {/* Jira Card */}
-          <div className="flex flex-col border rounded-3xl p-6 transition-all duration-300 bg-card border-border/50 hover:border-border">
+          <div className={`flex flex-col border rounded-3xl p-6 transition-all duration-300 bg-card ${isJiraConnected ? 'border-accent/40 shadow-lg' : 'border-border/50 hover:border-border'}`}>
             <div className="flex items-center gap-4 mb-6">
               <div className="w-14 h-14 bg-[#0052CC] rounded-2xl shadow-sm flex items-center justify-center p-2.5 flex-shrink-0 border border-blue-800 text-white">
                 <Kanban size={28} />
@@ -424,9 +487,15 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
               <div>
                 <h3 className="font-black text-xl">Jira</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="inline-block px-2.5 py-1 bg-blue-500/10 text-blue-500 text-[10px] font-bold uppercase tracking-wider rounded-md">
-                    Read & Write
-                  </span>
+                  {isJiraConnected === true ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 text-green-600 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                      <CheckCircle2 size={12} /> Connected
+                    </span>
+                  ) : (
+                    <span className="inline-block px-2.5 py-1 bg-blue-500/10 text-blue-500 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                      Read & Write
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -436,12 +505,27 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
             </p>
             
             <div className="mt-auto">
-              <button
-                onClick={(e) => { e.stopPropagation(); handleComingSoon(); }}
-                className="w-full px-4 py-3 bg-muted hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/30 transition-all text-foreground font-bold rounded-xl text-sm flex items-center justify-center gap-2"
-              >
-                <Link2 size={16} /> Connect to Jira
-              </button>
+              {isJiraConnected === false ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleConnectJira(); }}
+                  className="w-full px-4 py-3 bg-muted hover:bg-accent hover:text-white hover:shadow-lg hover:shadow-accent/30 transition-all text-foreground font-bold rounded-xl text-sm flex items-center justify-center gap-2"
+                >
+                  <Link2 size={16} /> Connect to Jira
+                </button>
+              ) : isJiraConnected === true ? (
+                <div className="flex gap-2">
+                  <button onClick={handleDisconnectJira} className="flex-1 px-4 py-3 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
+                    Disconnect
+                  </button>
+                  <button onClick={() => setActiveConnector('jira')} className="flex-[2] px-4 py-3 bg-accent text-white shadow-lg shadow-accent/30 hover:shadow-accent/50 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
+                    Create Ticket <ChevronDown size={16} className="-rotate-90" />
+                  </button>
+                </div>
+              ) : (
+                <button disabled className="w-full px-4 py-3 bg-muted text-muted-foreground font-bold rounded-xl text-sm flex items-center justify-center gap-2">
+                  <Loader2 size={16} className="animate-spin" /> Checking Status...
+                </button>
+              )}
             </div>
           </div>
         </div>

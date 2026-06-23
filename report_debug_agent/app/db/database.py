@@ -59,12 +59,30 @@ class UserIntegration(Base):
     __tablename__ = "user_integrations"
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    provider = Column(String, index=True) # e.g., 'google'
+    provider = Column(String, index=True) # e.g., 'google', 'jira'
     access_token = Column(String)
     refresh_token = Column(String, nullable=True)
     token_expiry = Column(DateTime, nullable=True)
+    metadata_json = Column(String, nullable=True) # To store Jira cloud_id or other metadata
     
     user = relationship("User", back_populates="integrations")
+
+class JiraTicketDraft(Base):
+    __tablename__ = "jira_ticket_drafts"
+    id = Column(String, primary_key=True) # UUID
+    session_id = Column(String, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    project_id = Column(String, nullable=True)
+    issue_type = Column(String, nullable=True)
+    collected_answers = Column(String, default="{}") # JSON
+    confidence_score = Column(Integer, default=0)
+    ticket_draft = Column(String, nullable=True) # JSON or markdown
+    test_cases = Column(String, nullable=True) # JSON or markdown
+    status = Column(String, default="gathering") # 'gathering', 'ready_for_generation', 'review', 'submitted'
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User")
 
 class Document(Base):
     __tablename__ = "documents"
@@ -126,6 +144,15 @@ def _ensure_chat_session_columns():
     inspector = inspect(engine)
     existing_tables = inspector.get_table_names()
 
+    # Check user_integrations
+    if "user_integrations" in existing_tables:
+        ui_columns = {col["name"] for col in inspector.get_columns("user_integrations")}
+        if "metadata_json" not in ui_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE user_integrations ADD COLUMN metadata_json VARCHAR"))
+
+    # Check jira_ticket_drafts (new table handled by create_all usually, but we check)
+    
     # Check chat_sessions
     if "chat_sessions" in existing_tables:
         chat_columns = {col["name"] for col in inspector.get_columns("chat_sessions")}
