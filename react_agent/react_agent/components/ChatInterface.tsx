@@ -92,6 +92,7 @@ const SLASH_COMMANDS: SlashCommand[] = [
   { name: 'mindmap', description: 'Turn documents into structured visual knowledge' },
   { name: 'doc-chat', description: 'Chat with your documents intelligently' },
   { name: 'extract-insights', description: 'Pull key ideas, summaries, and action items' },
+  { name: 'jira', description: 'Configure Jira and create issue-type wise tickets' },
 ];
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({

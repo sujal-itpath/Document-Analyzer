@@ -6,6 +6,7 @@ import HomeView from '../../components/HomeView';
 import ChatInterface from '../../components/ChatInterface';
 import DocumentViewer from '../../components/DocumentViewer';
 import IntegrationsView from '../../components/IntegrationsView';
+import JiraAssistantView from '../../components/JiraAssistantView';
 import { useAuth } from '../../context/AuthContext';
 import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
@@ -13,7 +14,7 @@ import { Loader2, ArrowLeft } from 'lucide-react';
 import { apiUrl, authHeaders } from '../../lib/api';
 import type { DocumentItem } from '../../lib/types';
 
-type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
+type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations' | 'jira-assistant';
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
   messages: Array<{ role: 'user' | 'agent'; content: string; timestamp: string }>;
@@ -365,6 +366,13 @@ export default function Dashboard() {
     if (!rawInput && !quotedText) return;
     if (isThinking) return;
 
+    if (rawInput.startsWith('/jira')) {
+      setInputText('');
+      setQuotedText(undefined);
+      setActiveView('jira-assistant');
+      return;
+    }
+
     setInputText('');
     setQuotedText(undefined);
     
@@ -556,6 +564,15 @@ export default function Dashboard() {
                 onOpenChat={handleOpenChat}
               />
             </div>
+          </div>
+        )}
+
+        {activeView === 'jira-assistant' && (
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <JiraAssistantView
+              onBack={() => setActiveView('chat')}
+              projectId={activeProject?.id}
+            />
           </div>
         )}
 

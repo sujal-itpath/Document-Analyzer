@@ -17,8 +17,8 @@ interface Session {
 interface SidebarProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-  activeView: 'home' | 'doc-select' | 'chat' | 'integrations';
-  setActiveView: (view: 'home' | 'doc-select' | 'chat' | 'integrations') => void;
+  activeView: 'home' | 'doc-select' | 'chat' | 'integrations' | 'jira-assistant';
+  setActiveView: (view: 'home' | 'doc-select' | 'chat' | 'integrations' | 'jira-assistant') => void;
   sessions: Session[];
   currentSessionId?: string;
   draftSessionId?: string | null;
@@ -147,21 +147,6 @@ const Sidebar: React.FC<SidebarProps> = ({
     !visibleSessions.some(session => session.id === optimisticSession.id)
   ) {
     visibleSessions = [optimisticSession, ...visibleSessions];
-  }
-
-  if (
-    draftSessionId &&
-    draftSessionTitle &&
-    !visibleSessions.some(session => session.id === draftSessionId)
-  ) {
-    visibleSessions = [
-      {
-        id: draftSessionId,
-        title: draftSessionTitle,
-        created_at: new Date().toISOString(),
-      },
-      ...visibleSessions,
-    ];
   }
 
   return (
@@ -342,15 +327,18 @@ const Sidebar: React.FC<SidebarProps> = ({
                   ) : (
                     <button
                       onClick={() => {
-                        if (session.id === draftSessionId && !currentSessionId) return;
+                        if (session.id === currentSessionId) {
+                          setActiveView('chat');
+                          return;
+                        }
                         onSessionSelect(session.id);
                       }}
                       title={!isOpen ? session.title : undefined}
-                      className={`w-full cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${currentSessionId === session.id || (!currentSessionId && draftSessionId === session.id)
+                      className={`w-full cursor-pointer flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all group ${currentSessionId === session.id
                         ? 'bg-accent/10 text-accent border border-accent/20'
                         : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                         }`}
-                      disabled={session.id === draftSessionId && !currentSessionId}
+                      disabled={activeView === 'chat' && session.id === currentSessionId}
                     >
                       {pinnedSessions.includes(session.id) ? (
                         <Pin size={14} className="flex-shrink-0 text-accent fill-accent/20" />
@@ -366,17 +354,15 @@ const Sidebar: React.FC<SidebarProps> = ({
                               {formatDate(session.created_at)}
                             </p>
                           </div>
-                          {!(session.id === draftSessionId && !currentSessionId) && (
-                            <div
-                              className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeMenuId === session.id ? 'opacity-100' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveMenuId(activeMenuId === session.id ? null : session.id);
-                              }}
-                            >
-                              <MoreVertical size={14} className="text-muted-foreground hover:text-foreground" />
-                            </div>
-                          )}
+                          <div
+                            className={`opacity-0 group-hover:opacity-100 transition-opacity ${activeMenuId === session.id ? 'opacity-100' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === session.id ? null : session.id);
+                            }}
+                          >
+                            <MoreVertical size={14} className="text-muted-foreground hover:text-foreground" />
+                          </div>
                         </div>
                       )}
                     </button>

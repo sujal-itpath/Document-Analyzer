@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { apiUrl, authHeaders } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { Loader2, ArrowLeft, Kanban, CheckCircle2, ChevronRight, Send, AlertCircle, RefreshCw } from 'lucide-react';
+import { Loader2, ArrowLeft, Kanban, CheckCircle2, ChevronRight, Send, AlertCircle, RefreshCw, Link2 } from 'lucide-react';
 
 interface JiraAssistantViewProps {
   onBack: () => void;
@@ -42,6 +42,22 @@ const JiraAssistantView: React.FC<JiraAssistantViewProps> = ({ onBack, projectId
   const [isLoadingSetup, setIsLoadingSetup] = useState(false);
   const [setupError, setSetupError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+
+  const handleConnectJira = async () => {
+    try {
+      const res = await fetch(apiUrl('/auth/jira/login'), {
+        headers: authHeaders(token)
+      });
+      const data = await res.json();
+      if (res.ok && data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        setSetupError(data.detail || 'Failed to initialize Jira Login');
+      }
+    } catch (err) {
+      setSetupError('Network error trying to reach the server.');
+    }
+  };
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -332,8 +348,19 @@ const JiraAssistantView: React.FC<JiraAssistantViewProps> = ({ onBack, projectId
               <h3 className="text-2xl font-black mb-6">Create New Ticket</h3>
               
               {setupError && (
-                <div className="mb-6 p-4 rounded-xl flex items-center gap-3 bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold">
-                  <AlertCircle size={16} /> {setupError}
+                <div className="mb-6 p-4 rounded-xl flex flex-col gap-3 bg-red-500/10 border border-red-500/20 text-red-500 text-sm font-bold animate-in fade-in">
+                  <div className="flex items-center gap-3">
+                    <AlertCircle size={16} className="shrink-0" />
+                    <span>{setupError}</span>
+                  </div>
+                  {setupError.toLowerCase().includes('not connected') && (
+                    <button
+                      onClick={handleConnectJira}
+                      className="mt-1 w-full py-2.5 bg-accent hover:bg-accent/90 text-white font-bold rounded-lg transition-all text-xs flex items-center justify-center gap-2 shadow-sm shadow-accent/25 hover:shadow-accent/40"
+                    >
+                      <Link2 size={13} /> Connect Jira Account
+                    </button>
+                  )}
                 </div>
               )}
               
