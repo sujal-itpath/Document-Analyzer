@@ -22,6 +22,15 @@ def get_chat_model(temperature=0):
             temperature=temperature
         )
     
+    if settings.GEMINI_API_KEY:
+        logger.info("Ollama is down. Falling back to Gemini for chat model.")
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(
+            model=settings.GEMINI_MODEL,
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=temperature
+        )
+
     if settings.GROQ_API_KEY:
         logger.info("Ollama is down. Falling back to Groq for chat model.")
         from langchain_groq import ChatGroq
@@ -31,7 +40,7 @@ def get_chat_model(temperature=0):
             temperature=temperature
         )
     
-    raise RuntimeError("Ollama is unavailable and GROQ_API_KEY is not set.")
+    raise RuntimeError("Ollama is unavailable, and neither GEMINI_API_KEY nor GROQ_API_KEY is set.")
 
 def get_llm(temperature=0):
     """Returns OllamaLLM if available, otherwise ChatGroq wrapper as fallback."""
@@ -43,6 +52,25 @@ def get_llm(temperature=0):
             temperature=temperature
         )
     
+    if settings.GEMINI_API_KEY:
+        logger.info("Ollama is down. Falling back to Gemini for LLM.")
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        chat_model = ChatGoogleGenerativeAI(
+            model=settings.GEMINI_MODEL,
+            google_api_key=settings.GEMINI_API_KEY,
+            temperature=temperature
+        )
+        
+        class StringReturningGemini:
+            def __init__(self, chat_model):
+                self.chat_model = chat_model
+            
+            def invoke(self, prompt, **kwargs):
+                res = self.chat_model.invoke(prompt, **kwargs)
+                return res.content if hasattr(res, 'content') else str(res)
+                
+        return StringReturningGemini(chat_model)
+
     if settings.GROQ_API_KEY:
         logger.info("Ollama is down. Falling back to Groq for LLM.")
         from langchain_groq import ChatGroq
@@ -63,7 +91,7 @@ def get_llm(temperature=0):
                 
         return StringReturningGroq(chat_model)
     
-    raise RuntimeError("Ollama is unavailable and GROQ_API_KEY is not set.")
+    raise RuntimeError("Ollama is unavailable, and neither GEMINI_API_KEY nor GROQ_API_KEY is set.")
 
 def get_embeddings():
     """Returns OllamaEmbeddings if available, otherwise Hugging Face Inference API as fallback."""
@@ -74,6 +102,14 @@ def get_embeddings():
             model=settings.OLLAMA_EMBED_MODEL,
         )
     
+    if settings.GEMINI_API_KEY:
+        logger.info("Ollama is down. Falling back to Gemini for embeddings.")
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        return GoogleGenerativeAIEmbeddings(
+            model=settings.GEMINI_EMBED_MODEL,
+            google_api_key=settings.GEMINI_API_KEY
+        )
+    
     if settings.HUGGING_FACE_API_KEY:
         logger.info("Ollama is down. Falling back to local Hugging Face for embeddings.")
         from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -81,4 +117,4 @@ def get_embeddings():
             model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
     
-    raise RuntimeError("Ollama is unavailable and HUGGING_FACE_API_KEY is not set.")
+    raise RuntimeError("Ollama is unavailable, and neither GEMINI_API_KEY nor HUGGING_FACE_API_KEY is set.")
