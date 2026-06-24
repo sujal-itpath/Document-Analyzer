@@ -34,7 +34,7 @@ export default function Dashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeView, setActiveView] = useState<ViewType>('home');
   const [currentSessionId, setCurrentSessionId] = useState<string | undefined>(undefined);
-  const { isAuthenticated, token: authToken, loading, logout } = useAuth();
+  const { isAuthenticated, token: authToken, loading, logout, activeProject } = useAuth();
   const router = useRouter();
 
   const [selectedDocs, setSelectedDocs] = useState<DocumentItem[]>([]);

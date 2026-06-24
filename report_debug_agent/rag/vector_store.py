@@ -9,6 +9,7 @@ Changes from original:
 - On delete, BM25 store is pruned
 """
 
+from langchain_ollama import OllamaEmbeddings
 import os
 import shutil
 import logging
