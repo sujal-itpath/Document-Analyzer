@@ -34,7 +34,12 @@ _CHUNK_SIZE = 600
 _CHUNK_OVERLAP = 120
 
 
-def _get_embeddings() -> OllamaEmbeddings:
+def _get_embeddings():
+    import os
+    if os.environ.get("GOOGLE_API_KEY"):
+        from langchain_community.embeddings import HuggingFaceEmbeddings
+        return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+    
     return OllamaEmbeddings(
         base_url=settings.OLLAMA_BASE_URL,
         model=settings.OLLAMA_EMBED_MODEL,

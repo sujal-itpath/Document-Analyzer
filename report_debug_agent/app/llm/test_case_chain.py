@@ -61,11 +61,22 @@ def generate_test_case_output(
         test_type=test_type
     )
     
-    llm = ChatOllama(
-        base_url=settings.OLLAMA_BASE_URL,
-        model=settings.OLLAMA_CHAT_MODEL,
-        temperature=0.1,
-    )
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    
+    if os.environ.get("GROQ_API_KEY"):
+        from langchain_groq import ChatGroq
+        llm = ChatGroq(
+            model_name="llama-3.3-70b-versatile",
+            temperature=0.1,
+        )
+    else:
+        llm = ChatOllama(
+            base_url=settings.OLLAMA_BASE_URL,
+            model=settings.OLLAMA_CHAT_MODEL,
+            temperature=0.1,
+        )
     
     messages = [
         SystemMessage(content="You are an expert QA engineer. Output ONLY valid JSON."),

@@ -47,10 +47,18 @@ class ApiResponse(BaseModel, Generic[T]):
 @router.post("/generate", response_model=ApiResponse[TestCaseResponseData], status_code=200)
 async def generate_test_cases_endpoint(
     request: TestCaseRequest,
-    project_id: Optional[int] = None,
+    project_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> ApiResponse[TestCaseResponseData]:
+    # Parse project_id
+    parsed_project_id = None
+    if project_id is not None and str(project_id).strip() != "":
+        try:
+            parsed_project_id = int(project_id)
+        except ValueError:
+            pass
+
     collection_name = sanitise_collection_name(request.filename)
 
     if not collection_exists(collection_name):
@@ -105,7 +113,7 @@ async def generate_test_cases_endpoint(
         filename=request.filename,
         test_type=request.test_type or "Manual",
         total_cases=total_cases,
-        project_id=project_id
+        project_id=parsed_project_id
     )
     db.add(tc_run)
     db.commit()
@@ -143,15 +151,18 @@ async def generate_test_cases_endpoint(
 @router.get("/history", response_model=ApiResponse[List[dict]])
 async def get_test_case_history(
     filename: Optional[str] = None,
-    project_id: Optional[int] = None,
+    project_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(TestCaseRun)
     if filename:
         query = query.filter(TestCaseRun.filename == filename)
-    if project_id is not None:
-        query = query.filter(TestCaseRun.project_id == project_id)
+    if project_id is not None and str(project_id).strip() != "":
+        try:
+            query = query.filter(TestCaseRun.project_id == int(project_id))
+        except ValueError:
+            pass
         
     runs = query.order_by(TestCaseRun.created_at.desc()).all()
     
