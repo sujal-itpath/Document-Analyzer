@@ -188,3 +188,19 @@ def submit_jira_draft(req: DraftSubmitRequest, current_user: User = Depends(get_
         logger.error(f"Error submitting Jira ticket: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+from app.models.jira_models import JiraPushRequest, JiraTicketData
+from app.services.jira_test_case_service import push_test_cases_to_jira
+
+@router.post("/push-test-cases", response_model=JiraTicketData)
+def push_test_cases(req: JiraPushRequest, current_user: User = Depends(get_current_user)):
+    """Push structured test cases into Jira as a unified issue ticket"""
+    try:
+        result = push_test_cases_to_jira(req)
+        return result
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except RuntimeError as re:
+        raise HTTPException(status_code=502, detail=str(re))
+    except Exception as e:
+        logger.error(f"Error pushing test cases to Jira: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

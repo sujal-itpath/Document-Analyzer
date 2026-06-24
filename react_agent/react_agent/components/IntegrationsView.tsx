@@ -4,6 +4,7 @@ import { useDialog } from './ui/Dialog';
 import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, Kanban, ArrowLeft, ChevronDown } from 'lucide-react';
 import { apiUrl, authHeaders } from '../lib/api';
 import JiraAssistantView from './JiraAssistantView';
+import { JiraTestCasePushDialog } from './JiraTestCasePushDialog';
 
 interface IntegrationsViewProps {
   onSyncComplete?: () => void;
@@ -36,7 +37,8 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
   const [syncingDocId, setSyncingDocId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<{message: string, isError: boolean} | null>(null);
 
-  const [activeConnector, setActiveConnector] = useState<string | null>(null);
+  const [activeConnector, setActiveConnector] = useState<'google_drive' | 'jira' | null>(null);
+  const [isTestCasePushOpen, setIsTestCasePushOpen] = useState(false);
 
   const fetchJiraStatus = async () => {
     if (!token) return;
@@ -268,7 +270,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
   }
 
   // Google Docs View (Detailed list)
-  if (activeConnector === 'google') {
+  if (activeConnector === 'google_drive') {
     return (
       <div className="h-full flex flex-col bg-background relative z-0 overflow-hidden">
         <div className="px-6 py-4 border-b border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-card/50 flex-shrink-0">
@@ -423,7 +425,7 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Google Docs Card */}
           <div 
-            onClick={() => isConnected === true && setActiveConnector('google')}
+            onClick={() => isConnected === true && setActiveConnector('google_drive')}
             className={`flex flex-col border rounded-3xl p-6 transition-all duration-300 bg-card ${
               isConnected === true 
                 ? 'cursor-pointer hover:border-accent/40 hover:shadow-lg hover:-translate-y-1' 
@@ -514,11 +516,14 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
                 </button>
               ) : isJiraConnected === true ? (
                 <div className="flex gap-2">
-                  <button onClick={handleDisconnectJira} className="flex-1 px-4 py-3 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
+                  <button onClick={handleDisconnectJira} className="flex-1 px-4 py-3 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold rounded-xl transition-all text-[11px] flex items-center justify-center gap-1">
                     Disconnect
                   </button>
-                  <button onClick={() => setActiveConnector('jira')} className="flex-[2] px-4 py-3 bg-accent text-white shadow-lg shadow-accent/30 hover:shadow-accent/50 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
-                    Create Ticket <ChevronDown size={16} className="-rotate-90" />
+                  <button onClick={() => setActiveConnector('jira')} className="flex-[1.5] px-4 py-3 bg-accent text-white shadow-lg shadow-accent/30 hover:shadow-accent/50 font-bold rounded-xl transition-all text-[11px] flex items-center justify-center gap-1">
+                    Create Ticket <ChevronDown size={14} className="-rotate-90" />
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); setIsTestCasePushOpen(true); }} className="flex-[1.5] px-4 py-3 bg-indigo-600 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-600/50 font-bold rounded-xl transition-all text-[11px] flex items-center justify-center gap-1">
+                    Push Test Cases
                   </button>
                 </div>
               ) : (
@@ -530,6 +535,11 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
           </div>
         </div>
       </div>
+      <JiraTestCasePushDialog
+        isOpen={isTestCasePushOpen}
+        onClose={() => setIsTestCasePushOpen(false)}
+        testCases={[]} // In a real flow, pass generated test cases here
+      />
     </div>
   );
 };
