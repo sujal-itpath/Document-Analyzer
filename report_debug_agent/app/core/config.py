@@ -14,13 +14,18 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./app_v2.db"
     
     # LLM
-    OLLAMA_BASE_URL: str = "http://192.168.1.240:11434"
-    OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
-    OLLAMA_CHAT_MODEL: str = "gemma4:e4b"
+    # OLLAMA_BASE_URL: str = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    # OLLAMA_EMBED_MODEL: str = "nomic-embed-text:latest"
+    # OLLAMA_CHAT_MODEL: str = "gemma4:e4b"
     
     # Groq Fallback
     GROQ_API_KEY: str | None = None
     GROQ_MODEL: str = "llama-3.1-8b-instant"
+
+    # Gemini Fallback
+    GEMINI_API_KEY: str | None = None
+    GEMINI_EMBED_MODEL: str = "models/gemini-embedding-001"
+    GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # Hugging Face Fallback for Embeddings
     HUGGING_FACE_API_KEY: str | None = None
