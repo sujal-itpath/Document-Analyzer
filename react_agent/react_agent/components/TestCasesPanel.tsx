@@ -16,7 +16,7 @@ export interface TestCase {
   tags: string[];
   linked_requirement?: string;
   acceptance_criteria: AcceptanceCriteria;
-  db_id?: int; // Optional db_id if we fetch from history
+  db_id?: number; // Optional db_id if we fetch from history
 }
 
 export interface TestCaseResponseData {
