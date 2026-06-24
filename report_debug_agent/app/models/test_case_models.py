@@ -8,6 +8,7 @@ class AcceptanceCriteria(BaseModel):
 
 class TestCase(BaseModel):
     id: str
+    db_id: Optional[int] = None
     title: str
     type: str
     priority: str

@@ -119,6 +119,7 @@ async def generate_test_cases_endpoint(
     db.commit()
     db.refresh(tc_run)
 
+    tc_records = []
     for module_name, cases in typed_test_cases.items():
         for tc in cases:
             tc_record = TestCaseRecord(
@@ -133,8 +134,13 @@ async def generate_test_cases_endpoint(
                 acceptance_criteria=json.dumps(tc.acceptance_criteria.model_dump())
             )
             db.add(tc_record)
+            tc_records.append((tc, tc_record))
     
     db.commit()
+
+    for tc, record in tc_records:
+        db.refresh(record)
+        tc.db_id = record.id
 
     return ApiResponse(
         status=200,
@@ -177,6 +183,7 @@ async def get_test_case_history(
             ac_dict = json.loads(r.acceptance_criteria)
             typed_test_cases[r.module_name].append(TestCase(
                 id=r.tc_id,
+                db_id=r.id,
                 title=r.title,
                 type=r.type,
                 priority=r.priority,
@@ -232,6 +239,7 @@ async def update_test_case(
     ac_dict = json.loads(record.acceptance_criteria)
     tc = TestCase(
         id=record.tc_id,
+        db_id=record.id,
         title=record.title,
         type=record.type,
         priority=record.priority,

@@ -110,21 +110,48 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
   };
 
   const saveEdit = async (moduleName: string) => {
-    // In a full implementation, we'd call the PUT API if we had the db_id
-    // For now, we update local state
     if (!editForm || !currentData) return;
     
-    // We would need the internal DB ID to actually call PUT /test-cases/{id}
-    // But since the prompt just asked to implement the UI to edit and save locally or backend:
+    const updatedGiven = editGiven.split('\n').map(s => s.trim()).filter(Boolean);
+    const updatedWhen = editWhen.split('\n').map(s => s.trim()).filter(Boolean);
+    const updatedThen = editThen.split('\n').map(s => s.trim()).filter(Boolean);
+
+    if (editForm.db_id && token) {
+      try {
+        const payload = {
+          title: editForm.title,
+          priority: editForm.priority,
+          tags: editForm.tags,
+          acceptance_criteria: {
+            given: updatedGiven,
+            when: updatedWhen,
+            then: updatedThen
+          }
+        };
+        const res = await fetch(`http://localhost:8000/test-cases/${editForm.db_id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          console.error("Failed to update test case on backend");
+        }
+      } catch (e) {
+        console.error('Error updating test case', e);
+      }
+    }
     
     const newData = { ...currentData };
     const cases = newData.test_cases[moduleName];
     const idx = cases.findIndex(c => c.id === editForm.id);
     if (idx !== -1) {
       const updatedForm = { ...editForm };
-      updatedForm.acceptance_criteria.given = editGiven.split('\n').map(s => s.trim()).filter(Boolean);
-      updatedForm.acceptance_criteria.when = editWhen.split('\n').map(s => s.trim()).filter(Boolean);
-      updatedForm.acceptance_criteria.then = editThen.split('\n').map(s => s.trim()).filter(Boolean);
+      updatedForm.acceptance_criteria.given = updatedGiven;
+      updatedForm.acceptance_criteria.when = updatedWhen;
+      updatedForm.acceptance_criteria.then = updatedThen;
       cases[idx] = updatedForm;
       setCurrentData(newData);
     }
