@@ -2,6 +2,9 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from app.db.database import SessionLocal, UserIntegration
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_google_credentials(user_id: int):
     """Fetch stored Google credentials for a user and construct a Credentials object"""
@@ -83,13 +86,13 @@ def replace_text_in_doc(user_id: int, doc_url_or_id: str, target_text: str, repl
 
 def list_google_docs(user_id: int):
     """Lists all Google Docs available to the authenticated user."""
-    print(f"DEBUG: Attempting to list docs for user {user_id}")
+    logger.debug("Attempting to list Google Docs for user %s", user_id)
     creds = get_google_credentials(user_id)
     if not creds:
-        print("DEBUG: No credentials found for user!")
+        logger.debug("No Google credentials found for user %s", user_id)
         raise Exception("Google account not connected.")
         
-    print(f"DEBUG: Found credentials, token valid: {creds.valid}")
+    logger.debug("Found Google credentials for user %s; token valid: %s", user_id, creds.valid)
     drive_service = build('drive', 'v3', credentials=creds)
     
     # Query for Google Docs, sort by recently modified
@@ -101,5 +104,5 @@ def list_google_docs(user_id: int):
     ).execute()
     
     files = results.get('files', [])
-    print(f"DEBUG: Found {len(files)} files")
+    logger.debug("Found %d Google Docs for user %s", len(files), user_id)
     return files

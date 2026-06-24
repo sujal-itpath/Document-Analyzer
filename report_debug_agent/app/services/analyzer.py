@@ -1,11 +1,14 @@
 import json
-from langchain_ollama import OllamaLLM
+import logging
+from app.core.llm_factory import get_llm
 from app.core.config import settings
 from app.db.database import SessionLocal, Document
 
+logger = logging.getLogger(__name__)
+
 class DocumentAnalyzer:
     def __init__(self):
-        self.llm = OllamaLLM(model=settings.OLLAMA_CHAT_MODEL, base_url=settings.OLLAMA_BASE_URL)
+        self.llm = get_llm()
 
     async def analyze(self, document_id: int, text: str):
         """Perform one-time analysis of a document to generate summary and suggestions."""
@@ -36,8 +39,17 @@ class DocumentAnalyzer:
                         doc.summary = data.get("summary", "")
                         doc.suggestions = json.dumps(data.get("suggestions", []))
                         db.commit()
-                        print(f"Analysis complete for document {document_id}")
+                        logger.info("Analysis complete for document %s", document_id)
                 finally:
                     db.close()
         except Exception as e:
-            print(f"Analysis failed for document {document_id}: {e}")
+            logger.warning("Analysis failed for document %s: %s", document_id, e)
+            db = SessionLocal()
+            try:
+                doc = db.query(Document).filter(Document.id == document_id).first()
+                if doc and not doc.summary:
+                    doc.summary = "Analysis failed or was skipped."
+                    doc.suggestions = "[]"
+                    db.commit()
+            finally:
+                db.close()

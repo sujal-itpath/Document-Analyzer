@@ -5,18 +5,12 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
-
-interface Document {
-  id: number;
-  filename: string;
-  upload_date: string;
-  summary?: string;
-  suggestions?: string;
-}
+import { apiUrl, authHeaders } from '../lib/api';
+import type { DocumentItem } from '../lib/types';
 
 interface HomeViewProps {
-  onSelectDocuments?: (docs: Document[]) => void;
-  onOpenChat?: (docs: Document[]) => void;
+  onSelectDocuments?: (docs: DocumentItem[]) => void;
+  onOpenChat?: (docs: DocumentItem[]) => void;
   /** When 'select', shows a floating "Start Chat" bar. Default: 'manage' */
   mode?: 'manage' | 'select';
   initialSelectedIds?: number[];
@@ -33,12 +27,12 @@ const HomeView = ({
   onDocumentDeleted,
   projectId,
 }: HomeViewProps) => {
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>(initialSelectedIds);
   const [isLoading, setIsLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<Document | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentItem | null>(null);
   const { token, logout } = useAuth();
   const dialog = useDialog();
 
@@ -57,10 +51,10 @@ const HomeView = ({
   const fetchDocuments = async () => {
     try {
       const url = projectId
-        ? `http://localhost:8000/documents?project_id=${projectId}`
-        : 'http://localhost:8000/documents';
+        ? apiUrl(`/documents?project_id=${projectId}`)
+        : apiUrl('/documents');
       const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       if (res.status === 401) {
         logout();
@@ -74,7 +68,7 @@ const HomeView = ({
     }
   };
 
-  const toggleSelection = (doc: Document) => {
+  const toggleSelection = (doc: DocumentItem) => {
     setSelectedIds(prev =>
       prev.includes(doc.id) ? prev.filter(id => id !== doc.id) : [...prev, doc.id]
     );
@@ -91,9 +85,9 @@ const HomeView = ({
       formData.append('project_id', projectId.toString());
     }
     try {
-      const res = await fetch('http://localhost:8000/upload', {
+      const res = await fetch(apiUrl('/upload'), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
         body: formData,
       });
       if (res.status === 401) {
@@ -114,7 +108,7 @@ const HomeView = ({
     }
   };
 
-  const handleDelete = async (doc: Document, e: React.MouseEvent) => {
+  const handleDelete = async (doc: DocumentItem, e: React.MouseEvent) => {
     e.stopPropagation();
     const confirmed = await dialog.confirm({
       title: 'Delete document?',
@@ -124,9 +118,9 @@ const HomeView = ({
     });
     if (!confirmed) return;
     try {
-      const res = await fetch(`http://localhost:8000/documents/${doc.id}`, {
+      const res = await fetch(apiUrl(`/documents/${doc.id}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: authHeaders(token),
       });
       if (res.status === 401) {
         logout();

@@ -10,7 +10,7 @@ export interface DialogOptions {
   title: string;
   message: string;
   confirmLabel?: string;
-  cancelLabel?: string;
+  cancelLabel?: string | null;
   variant?: DialogVariant;
 }
 
@@ -159,6 +159,6 @@ export function useDialog() {
 
     /** Shows a single-button info/success dialog. */
     alert: (options: Omit<DialogOptions, 'cancelLabel'>) =>
-      ctx.openDialog({ ...options, cancelLabel: null as any }),
+      ctx.openDialog({ ...options, cancelLabel: null }),
   };
 }

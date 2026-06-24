@@ -100,13 +100,9 @@ def _cosine_rerank(
         return []
 
     try:
-        from langchain_ollama import OllamaEmbeddings
-        from app.core.config import settings
+        from app.core.llm_factory import get_embeddings
 
-        embeddings_model = OllamaEmbeddings(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_EMBED_MODEL,
-        )
+        embeddings_model = get_embeddings()
 
         query_vec = embeddings_model.embed_query(query)
         candidate_texts = [doc.page_content for doc in candidates]

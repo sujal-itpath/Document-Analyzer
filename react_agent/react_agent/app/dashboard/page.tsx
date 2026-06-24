@@ -11,9 +11,10 @@ import { useDialog } from '../../components/ui/Dialog';
 import { useRouter } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import TestCasesPanel, { TestCaseResponseData } from '../../components/TestCasesPanel';
+import { apiUrl, authHeaders } from '../../lib/api';
+import type { DocumentItem } from '../../lib/types';
 
 type ViewType = 'home' | 'doc-select' | 'chat' | 'integrations';
-type DocumentItem = { id: number; filename: string; summary?: string; suggestions?: string; upload_date?: string; isDeleted?: boolean };
 type MessageItem = { role: 'user' | 'agent'; content: string };
 type SessionMessagesResponse = {
   messages: Array<{ role: 'user' | 'agent'; content: string; timestamp: string }>;
@@ -87,9 +88,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
-      if (url.searchParams.has('integration')) {
+      if (url.searchParams.has('connector')) {
         setActiveView('integrations');
-        url.searchParams.delete('integration');
+        url.searchParams.delete('connector');
         window.history.replaceState({}, '', url.toString());
       }
     }
@@ -188,8 +189,8 @@ export default function Dashboard() {
     if (!authToken) return;
     setIsThinking(true);
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}/messages`, {
-        headers: { Authorization: `Bearer ${authToken}` },
+      const res = await fetch(apiUrl(`/sessions/${sessionId}/messages`), {
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -226,9 +227,9 @@ export default function Dashboard() {
   const handleSessionDelete = async (sessionId: string) => {
     if (!authToken) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+      const res = await fetch(apiUrl(`/sessions/${sessionId}`), {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: authHeaders(authToken),
       });
       if (res.status === 401) {
         logout();
@@ -250,11 +251,11 @@ export default function Dashboard() {
   const handleSessionRename = async (sessionId: string, newTitle: string) => {
     if (!authToken || !newTitle.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8000/sessions/${sessionId}`, {
+      const res = await fetch(apiUrl(`/sessions/${sessionId}`), {
         method: 'PATCH',
         headers: { 
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}` 
+          ...authHeaders(authToken),
         },
         body: JSON.stringify({ title: newTitle.trim() }),
       });
@@ -297,11 +298,11 @@ export default function Dashboard() {
   const persistSessionDocuments = async (sessionId: string, docs: DocumentItem[]) => {
     if (!authToken) return;
     const uniqueIds = Array.from(new Set(docs.map(doc => doc.id)));
-    const res = await fetch(`http://localhost:8000/sessions/${sessionId}/documents`, {
+    const res = await fetch(apiUrl(`/sessions/${sessionId}/documents`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${authToken}`,
+        ...authHeaders(authToken),
       },
       body: JSON.stringify({ document_ids: uniqueIds }),
     });
@@ -321,9 +322,9 @@ export default function Dashboard() {
     formData.append('overwrite', 'false');
 
     try {
-      const res = await fetch('http://localhost:8000/upload', {
+      const res = await fetch(apiUrl('/upload'), {
         method: 'POST',
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: authHeaders(authToken),
         body: formData,
       });
 
@@ -415,11 +416,11 @@ export default function Dashboard() {
     const requestDocumentIds = selectedDocs.filter(d => !d.isDeleted).map(doc => doc.id);
 
     try {
-      const res = await fetch('http://localhost:8000/ask', {
+      const res = await fetch(apiUrl('/ask'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
+          ...authHeaders(authToken),
         },
         body: JSON.stringify({
           question: userMessage,
@@ -513,24 +514,60 @@ export default function Dashboard() {
 
       <main className="flex-1 overflow-hidden flex flex-col min-w-0">
         {activeView === 'home' && (
-          <div className="flex-1 overflow-hidden">
-            <HomeView
-              mode="manage"
-              onSelectDocuments={setSelectedDocs}
-              onOpenChat={handleOpenChat}
-              onDocumentDeleted={handleDocumentDeleted}
-            />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-card/50 flex-shrink-0">
+              <button
+                onClick={() => router.push('/workspaces?step=projects')}
+                className="p-2 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+                title="Back to Projects"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-black text-lg">Documents</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Manage and view your workspace documents
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <HomeView
+                mode="manage"
+                projectId={activeProject?.id}
+                onSelectDocuments={setSelectedDocs}
+                onOpenChat={handleOpenChat}
+                onDocumentDeleted={handleDocumentDeleted}
+              />
+            </div>
           </div>
         )}
 
         {activeView === 'integrations' && (
-          <div className="flex-1 overflow-hidden">
-            <IntegrationsView 
-              onSyncComplete={async () => {
-                const latestDocs = await fetchAllDocs();
-                setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
-              }}
-            />
+          <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center gap-3 bg-card/50 flex-shrink-0">
+              <button
+                onClick={() => setActiveView('home')}
+                className="p-2 hover:bg-muted rounded-xl transition-colors text-muted-foreground hover:text-foreground"
+                title="Back to Documents"
+              >
+                <ArrowLeft size={18} />
+              </button>
+              <div>
+                <h2 className="font-black text-lg">Connectors</h2>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Connect third-party apps to sync documents
+                </p>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <IntegrationsView 
+                projectId={activeProject?.id}
+                onSyncComplete={async () => {
+                  const latestDocs = await fetchAllDocs();
+                  setSelectedDocs(prev => prev.filter(doc => latestDocs.some(l => l.id === doc.id)));
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -564,6 +601,13 @@ export default function Dashboard() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {selectedDocs.length > 0 && (
               <div className="px-6 py-2.5 border-b border-border bg-card/40 flex items-center gap-3 flex-wrap flex-shrink-0">
+                <button
+                  onClick={() => setActiveView('home')}
+                  className="p-1.5 hover:bg-muted rounded-lg transition-colors text-muted-foreground hover:text-foreground mr-1"
+                  title="Back to Documents"
+                >
+                  <ArrowLeft size={16} />
+                </button>
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/50">
                   Context
                 </span>

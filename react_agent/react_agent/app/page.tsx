@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, Bot, FileText, LockKeyhole, MessageCircle, Upload, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import ThemeToggle from '../components/ThemeToggle';
 
 export default function LandingPage() {
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
@@ -29,6 +30,7 @@ export default function LandingPage() {
           </Link>
 
           <nav className="flex items-center gap-2">
+            <ThemeToggle className="mr-2 border border-border" />
             <Link
               href="/login"
               className="rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"

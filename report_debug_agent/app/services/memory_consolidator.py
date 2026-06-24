@@ -101,15 +101,10 @@ def consolidate_session(
         # ── 2. Build conversation text ────────────────────────────────────────
         conversation_text = _build_conversation_text(messages)
 
-        # ── 3. Call Ollama LLM for fact extraction ────────────────────────────
-        from langchain_ollama import ChatOllama
-        from app.core.config import settings
+        # ── 3. Call LLM for fact extraction ────────────────────────────
+        from app.core.llm_factory import get_chat_model
 
-        llm = ChatOllama(
-            base_url=settings.OLLAMA_BASE_URL,
-            model=settings.OLLAMA_CHAT_MODEL,
-            temperature=0,
-        )
+        llm = get_chat_model(temperature=0)
 
         prompt = _EXTRACTION_PROMPT.format(conversation=conversation_text)
         response = llm.invoke(prompt)

@@ -1,5 +1,6 @@
 import os
 import shutil
+import logging
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from typing import Optional
 from fastapi.responses import FileResponse
@@ -7,12 +8,14 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.database import get_db, Document as DBDocument, User
 from app.api.endpoints.auth import get_current_user
+from app.services.document_cleanup import cleanup_document_artifacts
 from app.services.document_processor import DocumentProcessor
 from app.services.analyzer import DocumentAnalyzer
 from rag.vector_store import setup_vector_store, delete_from_stores
 from app.services.google_docs_service import fetch_google_doc_docx, extract_doc_id_from_url, list_google_docs
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 analyzer = DocumentAnalyzer()
 processor = DocumentProcessor()
 
@@ -73,7 +76,7 @@ async def upload_documents(
                     full_text = "\n".join([d.page_content for d in extracted_docs])
                     background_tasks.add_task(analyzer.analyze, db_doc.id, full_text)
             except Exception as e:
-                print(f"Failed to start analysis for {file.filename}: {e}")
+                logger.warning("Failed to start analysis for %s: %s", file.filename, e)
 
         db.commit()
 
@@ -150,7 +153,7 @@ async def sync_google_doc(
                 full_text = "\n".join([d.page_content for d in extracted_docs])
                 background_tasks.add_task(analyzer.analyze, db_doc.id, full_text)
         except Exception as e:
-            print(f"Failed to start analysis for Google Doc: {e}")
+            logger.warning("Failed to start analysis for Google Doc: %s", e)
             
         setup_vector_store([file_path], overwrite=False)
         
@@ -172,6 +175,7 @@ async def get_google_docs_list(
         docs = list_google_docs(current_user.id)
         return {"documents": docs}
     except Exception as e:
+        logger.exception("Failed to list Google Docs")
         raise HTTPException(status_code=500, detail=f"Failed to list Google Docs: {str(e)}")
 
 @router.get("/documents")
@@ -214,19 +218,7 @@ async def delete_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
-    # Remove physical file and all associated index chunks
-    if doc.file_path:
-        try:
-            from rag.vector_store import delete_from_stores
-            delete_from_stores(doc.file_path)
-        except Exception as e:
-            print(f"Warning: could not remove index data for {doc.file_path}: {e}")
-
-        if os.path.exists(doc.file_path):
-            try:
-                os.remove(doc.file_path)
-            except Exception as e:
-                print(f"Warning: could not delete file {doc.file_path}: {e}")
+    cleanup_document_artifacts(doc.file_path)
 
     db.delete(doc)
     db.commit()

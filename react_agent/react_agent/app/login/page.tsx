@@ -5,6 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import { Bot, Mail, Lock, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { apiUrl } from '../../lib/api';
+import ThemeToggle from '../../components/ThemeToggle';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -32,7 +34,7 @@ export default function LoginPage() {
     formData.append('password', password);
 
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: formData,
@@ -44,8 +46,8 @@ export default function LoginPage() {
 
       const data = await response.json();
       login(data.access_token);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -53,6 +55,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="absolute top-6 right-6 z-50">
+        <ThemeToggle className="border border-border bg-card/50 backdrop-blur-xl" />
+      </div>
+
       <div className="absolute top-0 left-0 w-full h-full -z-10 overflow-hidden">
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-accent/10 blur-[120px] rounded-full animate-pulse"></div>
         <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] rounded-full animate-pulse [animation-delay:2s]"></div>
