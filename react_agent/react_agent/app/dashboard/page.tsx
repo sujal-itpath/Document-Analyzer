@@ -362,6 +362,11 @@ export default function Dashboard() {
   const handleGenerateTestCases = async (testType: string) => {
     if (!authToken || selectedDocs.length === 0) return;
     
+    const userMessage = ['Manual', 'API', 'Smoke', 'Regression', 'All'].includes(testType) 
+      ? `Generate ${testType} test cases` 
+      : testType;
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
     setIsThinking(true);
     try {
       const filename = selectedDocs[0].filename;

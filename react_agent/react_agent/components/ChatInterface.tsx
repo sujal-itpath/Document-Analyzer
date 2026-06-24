@@ -421,7 +421,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           )}
 
           {/* ── Test Cases Generate bar ── */}
-          {onGenerateTestCases && selectedDocs.length > 0 && !isThinking && (
+          {messages.length > 0 && onGenerateTestCases && selectedDocs.length > 0 && (
             <div className="flex flex-wrap items-center justify-end gap-2 animate-in fade-in duration-300">
               <select 
                 value={testType} 
