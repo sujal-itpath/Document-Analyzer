@@ -338,7 +338,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                         ? 'bg-accent/10 text-accent border border-accent/20'
                         : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                         }`}
-                      disabled={activeView === 'chat' && session.id === currentSessionId}
                     >
                       {pinnedSessions.includes(session.id) ? (
                         <Pin size={14} className="flex-shrink-0 text-accent fill-accent/20" />
