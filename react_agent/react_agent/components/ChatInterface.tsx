@@ -143,7 +143,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // ── Parse suggestions from last agent message ───────────────────────────────
   const processedMessages = useMemo(() => messages.map(msg => {
-    if (msg.role !== 'agent') return { ...msg, displayContent: msg.content };
+    if (msg.role !== 'agent') return { ...msg, displayContent: msg.content, parsedSuggestions: [], testCasesFilename: null };
     
     let displayContent = msg.content;
     let parsedSuggestions: string[] = [];
