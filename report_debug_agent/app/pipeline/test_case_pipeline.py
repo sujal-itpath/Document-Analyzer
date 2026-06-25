@@ -10,29 +10,29 @@ _BROAD_QUERY = (
     "user roles permissions conditions requirements functionalities"
 )
 
-def retrieve_context(query: str, collection_name: str) -> Tuple[List[str], List[Dict]]:
-    """Retrieve all chunks from the document in the vector store."""
+def retrieve_context(query: str, file_path: str) -> Tuple[List[str], List[Dict]]:
+    """Retrieve chunks from the document in the vector store using file_path filter."""
     retriever = get_retriever()
     if not retriever:
         return [], []
     
-    # In a real implementation we would filter by collection_name/filename
-    # For now we just query the retriever directly
-    docs = retriever.invoke(query)
+    # Use similarity_search directly on the vectorstore with metadata filter
+    docs = retriever.vectorstore.similarity_search(
+        query, 
+        k=20, 
+        filter={"source": file_path} if file_path else None
+    )
     
-    # If the collection_name matches filename, we can filter
-    # Assuming collection_name is derived from filename
-    # But since it's just a demo, we will just return all fetched docs
     return [d.page_content for d in docs], [d.metadata for d in docs]
 
 def generate_test_cases(
-    collection_name: str,
+    file_path: str,
     test_type: str | None,
 ) -> Tuple[Dict[str, list], List[int]]:
     """
     End-to-end pipeline to generate BDD test cases from an indexed document.
     """
-    documents, metadatas = retrieve_context(_BROAD_QUERY, collection_name)
+    documents, metadatas = retrieve_context(_BROAD_QUERY, file_path)
 
     if not documents:
         raise ValueError(

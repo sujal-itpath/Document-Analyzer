@@ -1,35 +1,39 @@
 import sqlite3
+import json
 import os
 
-db_path = "memory.sqlite"
+db_path = os.path.join(os.path.dirname(__file__), "memory.sqlite")
+conn = sqlite3.connect(db_path)
+conn.row_factory = sqlite3.Row
+cursor = conn.cursor()
 
-if not os.path.exists(db_path):
-    print(f"Database file '{db_path}' not found. Run the agent first to initialize it.")
-else:
+# Get the most recent checkpoints
+cursor.execute("SELECT thread_id, checkpoint_id, checkpoint FROM checkpoints ORDER BY thread_id DESC, checkpoint_id DESC LIMIT 5")
+rows = cursor.fetchall()
+
+print("MOST RECENT CHECKPOINTS:")
+for row in rows:
+    print(f"\n--- Thread: {row['thread_id']} | Checkpoint ID: {row['checkpoint_id']} ---")
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = cursor.fetchall()
-        
-        if not tables:
-            print("Database exists but contains no tables yet.")
-        else:
-            print(f"Found {len(tables)} tables: {[t[0] for t in tables]}")
-            for table in tables:
-                table_name = table[0]
-                cursor.execute(f"PRAGMA table_info({table_name});")
-                schema = cursor.fetchall()
-                print(f"\n--- Schema for table: {table_name} ---")
-                for col in schema:
-                    print(f"  Column: {col[1]} ({col[2]})")
-                
-                # Show row count
-                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
-                count = cursor.fetchone()[0]
-                print(f"  Total records: {count}")
-
-        conn.close()
+        # Checkpoint is usually a pickle or json. If it's pickle, we can't easily print it in python without langgraph.
+        # But langgraph sqlite checkpointer saves it as bytes.
+        checkpoint_data = row['checkpoint']
+        print(f"Data size: {len(checkpoint_data)} bytes")
     except Exception as e:
-        print(f"Error inspecting database: {e}")
+        print(f"Error parsing checkpoint: {e}")
+
+# Let's try to query the writes table to see the actual messages
+cursor.execute("SELECT thread_id, task_id, idx, channel, value FROM writes ORDER BY rowid DESC LIMIT 10")
+writes = cursor.fetchall()
+
+print("\nMOST RECENT WRITES (Messages):")
+for w in writes:
+    print(f"\n--- Thread: {w['thread_id']} | Channel: {w['channel']} ---")
+    try:
+        # value is typically json or pickled
+        val = w['value']
+        print(f"Raw value bytes preview: {val[:200]}")
+    except Exception as e:
+        print(f"Error reading value: {e}")
+
+conn.close()

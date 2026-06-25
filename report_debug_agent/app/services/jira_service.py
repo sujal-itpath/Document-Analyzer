@@ -43,7 +43,7 @@ class JiraService:
     def _get_request_kwargs(self, endpoint_path: str):
         if self.global_config and self.global_config.jira_api_token:
             base_url = self.global_config.jira_base_url.rstrip('/')
-            url = f"{base_url}/rest/api/3/{endpoint_path}"
+            url = f"{base_url}/rest/api/2/{endpoint_path}"
             return {
                 "url": url,
                 "auth": HTTPBasicAuth(self.global_config.jira_email, self.global_config.jira_api_token),
@@ -54,7 +54,7 @@ class JiraService:
         if not cloud_id:
             raise Exception("No Jira connection found (neither global nor OAuth)")
             
-        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/{endpoint_path}"
+        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/2/{endpoint_path}"
         return {
             "url": url,
             "headers": self._get_headers()
@@ -80,33 +80,13 @@ class JiraService:
         return project_data.get("issueTypes", [])
 
     def create_ticket(self, project_id: str, issue_type_name: str, summary: str, description: str, acceptance_criteria: str) -> dict:
-        # Format description to Atlassian Document Format (ADF)
-        # For simplicity, we use text blocks.
-        adf_description = {
-            "version": 1,
-            "type": "doc",
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": description}]
-                },
-                {
-                    "type": "heading",
-                    "attrs": {"level": 3},
-                    "content": [{"type": "text", "text": "Acceptance Criteria"}]
-                },
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": acceptance_criteria}]
-                }
-            ]
-        }
+        combined_description = f"{description}\n\n*Acceptance Criteria*\n{acceptance_criteria}"
         
         payload = {
             "fields": {
                 "project": {"id": project_id} if project_id.isdigit() else {"key": project_id},
                 "summary": summary,
-                "description": adf_description,
+                "description": combined_description,
                 "issuetype": {"name": issue_type_name}
             }
         }
@@ -120,19 +100,8 @@ class JiraService:
         return response.json()
 
     def add_comment(self, issue_id_or_key: str, comment_text: str) -> dict:
-        adf_comment = {
-            "version": 1,
-            "type": "doc",
-            "content": [
-                {
-                    "type": "paragraph",
-                    "content": [{"type": "text", "text": comment_text}]
-                }
-            ]
-        }
-        
         kwargs = self._get_request_kwargs(f"issue/{issue_id_or_key}/comment")
-        response = requests.post(json={"body": adf_comment}, **kwargs)
+        response = requests.post(json={"body": comment_text}, **kwargs)
         
         if not response.ok:
             raise Exception(f"Failed to add comment: {response.text}")
