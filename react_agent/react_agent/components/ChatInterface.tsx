@@ -29,6 +29,7 @@ interface ChatInterfaceProps {
   /** Notification to show (e.g. "Document X was removed"). Auto-dismisses. */
   warningMessage?: string;
   onGenerateTestCases?: (testType: string) => void;
+  onTestCasesGenerated?: (filename: string) => void;
 }
 
 const isFilenameOnly = (s: string) =>
@@ -99,7 +100,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages, inputText, setInputText, isThinking,
   onSendMessage, onClearChat, mode, availableDocuments, onDocumentSelect, selectedDocs = [],
   onUploadDocuments, isUploadingDocuments = false,
-  quotedText, onClearQuote, warningMessage, onGenerateTestCases
+  quotedText, onClearQuote, warningMessage, onGenerateTestCases, onTestCasesGenerated
 }) => {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -143,15 +144,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // ── Parse suggestions from last agent message ───────────────────────────────
   const processedMessages = useMemo(() => messages.map(msg => {
     if (msg.role !== 'agent') return { ...msg, displayContent: msg.content };
-    const match = msg.content.match(/Suggestions:\s*(.+)$/im);
+    
     let displayContent = msg.content;
     let parsedSuggestions: string[] = [];
-    if (match) {
-      parsedSuggestions = match[1].split('|').map(s => s.trim().replace(/^\[|\]$/g, '').trim()).filter(Boolean);
-      displayContent = msg.content.replace(/Suggestions:\s*(.+)$/im, '').trim();
+    let testCasesFilename: string | null = null;
+
+    // Parse suggestions
+    const suggestionMatch = displayContent.match(/Suggestions:\s*(.+)$/im);
+    if (suggestionMatch) {
+      parsedSuggestions = suggestionMatch[1].split('|').map(s => s.trim().replace(/^\[|\]$/g, '').trim()).filter(Boolean);
+      displayContent = displayContent.replace(/Suggestions:\s*(.+)$/im, '').trim();
     }
-    return { ...msg, displayContent, parsedSuggestions };
+
+    // Parse [TEST_CASES_GENERATED: filename]
+    const testCasesMatch = displayContent.match(/\[TEST_CASES_GENERATED:\s*(.+?)\]/i);
+    if (testCasesMatch) {
+      testCasesFilename = testCasesMatch[1].trim();
+      displayContent = displayContent.replace(/\[TEST_CASES_GENERATED:\s*(.+?)\]/i, '').trim();
+    }
+
+    return { ...msg, displayContent, parsedSuggestions, testCasesFilename };
   }), [messages]);
+
+  // Trigger test cases callback if the LAST message contains the tag
+  useEffect(() => {
+    if (messages.length === 0 || isThinking) return;
+    const lastMsg = processedMessages[processedMessages.length - 1];
+    if (lastMsg.role === 'agent' && lastMsg.testCasesFilename && onTestCasesGenerated) {
+      // Fire it once per unique message generation
+      onTestCasesGenerated(lastMsg.testCasesFilename);
+    }
+  }, [processedMessages, isThinking, onTestCasesGenerated]);
 
   const suggestions = useMemo<string[]>(() => {
     const lastAgent = [...processedMessages].reverse().find(m => m.role === 'agent') as any;

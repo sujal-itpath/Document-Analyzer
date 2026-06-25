@@ -11,9 +11,9 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 class GlobalConfigRequest(BaseModel):
-    jira_base_url: str
-    jira_email: str
-    jira_api_token: str
+    jira_base_url: str = ""
+    jira_email: str = ""
+    jira_api_token: str = ""
     project_key: Optional[str] = None
     issue_type: Optional[str] = None
 
@@ -39,7 +39,7 @@ def save_global_config(req: GlobalConfigRequest, current_user: User = Depends(ge
     
     config.jira_base_url = req.jira_base_url
     config.jira_email = req.jira_email
-    if req.jira_api_token and req.jira_api_token != "********":
+    if req.jira_api_token != "********":
         config.jira_api_token = req.jira_api_token
     config.project_key = req.project_key
     config.issue_type = req.issue_type

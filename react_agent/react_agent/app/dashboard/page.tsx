@@ -366,47 +366,50 @@ export default function Dashboard() {
   };
 
   const handleGenerateTestCases = async (testType: string) => {
-    if (!authToken || selectedDocs.length === 0) return;
+    if (!authToken) return;
     
     const userMessage = ['Manual', 'API', 'Smoke', 'Regression', 'All'].includes(testType) 
-      ? `Generate ${testType} test cases` 
+      ? `I want to generate ${testType} test cases.` 
       : testType;
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     
-    setIsThinking(true);
+    // Instead of directly calling the backend, we send a message to the LangGraph agent
+    // which will start the conversational workflow and eventually trigger [TEST_CASES_GENERATED: filename].
+    await handleSendMessage(undefined, userMessage);
+  };
+
+  const handleTestCasesGenerated = async (filename: string) => {
+    if (!authToken) return;
     try {
-      const filename = selectedDocs[0].filename;
-      const res = await fetch('http://localhost:8000/test-cases/generate', {
-        method: 'POST',
+      const res = await fetch(`http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`, {
         headers: {
-          'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
         },
-        body: JSON.stringify({
-          filename: filename,
-          test_type: testType,
-        }),
       });
 
-      if (res.status === 401) {
-        logout();
-        return;
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.detail || 'Failed to generate test cases');
-      }
+      if (!res.ok) throw new Error('Failed to fetch test cases history');
 
       const data = await res.json();
-      setTestCasesData(data.data);
-      setSplitViewContent('testcases');
-      setIsSplitView(true);
+      if (data.data && data.data.length > 0) {
+        setTestCasesData(data.data[0]); // Get the most recent run
+        setSplitViewContent('testcases');
+        setIsSplitView(true);
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Generation failed';
-      await dialog.alert({ title: 'Test Cases Generation Failed', message, variant: 'danger' });
-    } finally {
-      setIsThinking(false);
+      console.error("Failed to load generated test cases:", err);
+      // Wait for 1 second and retry once, sometimes history takes a moment to persist
+      setTimeout(async () => {
+        try {
+          const res = await fetch(`http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`, {
+            headers: { Authorization: `Bearer ${authToken}` },
+          });
+          const data = await res.json();
+          if (data.data && data.data.length > 0) {
+            setTestCasesData(data.data[0]);
+            setSplitViewContent('testcases');
+            setIsSplitView(true);
+          }
+        } catch (e) {}
+      }, 1500);
     }
   };
 
@@ -722,6 +725,7 @@ export default function Dashboard() {
               onClearQuote={() => setQuotedText(undefined)}
               warningMessage={warningMessage}
               onGenerateTestCases={handleGenerateTestCases}
+              onTestCasesGenerated={handleTestCasesGenerated}
               onDocumentSelect={(doc) => {
                 setSelectedDocs(prev => {
                   if (prev.find(existing => existing.id === doc.id)) {

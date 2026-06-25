@@ -31,6 +31,7 @@ def collection_exists(name: str) -> bool:
     return True
 
 from app.pipeline.test_case_pipeline import generate_test_cases
+from app.services.test_case_service import run_test_case_generation_and_save
 
 router = APIRouter()
 
@@ -68,90 +69,21 @@ async def generate_test_cases_endpoint(
         )
 
     try:
-        raw_test_cases, citations = generate_test_cases(
-            collection_name=collection_name,
+        data = run_test_case_generation_and_save(
+            db=db,
+            filename=request.filename,
             test_type=request.test_type,
+            project_id=parsed_project_id
         )
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Test case generation failed: {str(e)}")
 
-    typed_test_cases: dict[str, list[TestCase]] = {}
-
-    for module_name, tc_list in raw_test_cases.items():
-        typed_cases = []
-        for tc in tc_list:
-            try:
-                criteria = AcceptanceCriteria(
-                    given=tc.get("acceptance_criteria", {}).get("given", []),
-                    when=tc.get("acceptance_criteria", {}).get("when", []),
-                    then=tc.get("acceptance_criteria", {}).get("then", []),
-                )
-                typed_case = TestCase(
-                    id=tc.get("id", "TC_???"),
-                    title=tc.get("title", "Untitled"),
-                    type=tc.get("type", request.test_type or "Manual"),
-                    priority=tc.get("priority", "Medium"),
-                    tags=tc.get("tags", []),
-                    linked_requirement=tc.get("linked_requirement"),
-                    acceptance_criteria=criteria,
-                )
-                typed_cases.append(typed_case)
-            except Exception:
-                continue
-        if typed_cases:
-            typed_test_cases[module_name] = typed_cases
-
-    total_cases = sum(len(cases) for cases in typed_test_cases.values())
-
-    if total_cases == 0:
-        raise HTTPException(status_code=400, detail="No test cases could be extracted.")
-
-    # Save to database
-    tc_run = TestCaseRun(
-        filename=request.filename,
-        test_type=request.test_type or "Manual",
-        total_cases=total_cases,
-        project_id=parsed_project_id
-    )
-    db.add(tc_run)
-    db.commit()
-    db.refresh(tc_run)
-
-    tc_records = []
-    for module_name, cases in typed_test_cases.items():
-        for tc in cases:
-            tc_record = TestCaseRecord(
-                run_id=tc_run.id,
-                tc_id=tc.id,
-                module_name=module_name,
-                title=tc.title,
-                type=tc.type,
-                priority=tc.priority,
-                tags=json.dumps(tc.tags),
-                linked_requirement=tc.linked_requirement,
-                acceptance_criteria=json.dumps(tc.acceptance_criteria.model_dump())
-            )
-            db.add(tc_record)
-            tc_records.append((tc, tc_record))
-    
-    db.commit()
-
-    for tc, record in tc_records:
-        db.refresh(record)
-        tc.db_id = record.id
-
     return ApiResponse(
         status=200,
-        data=TestCaseResponseData(
-            filename=request.filename,
-            test_type=request.test_type or "Manual",
-            total_cases=total_cases,
-            citations=citations,
-            test_cases=typed_test_cases,
-        ),
-        message=f"{total_cases} test case(s) generated successfully."
+        data=data,
+        message=f"{data.total_cases} test case(s) generated successfully."
     )
 
 @router.get("/history", response_model=ApiResponse[List[dict]])
