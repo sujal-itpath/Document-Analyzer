@@ -2,7 +2,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   Send, User, Bot, Copy, Check, Trash2, FileText, Plus,
-  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle
+  Sparkles, X, AtSign, Upload, Loader2, MessageSquareQuote, AlertTriangle, Terminal, Code
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

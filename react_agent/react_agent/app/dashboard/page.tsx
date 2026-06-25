@@ -97,12 +97,13 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    const storageKey = activeProject ? `current_session_id_${activeProject.id}` : 'current_session_id';
     if (currentSessionId) {
-      localStorage.setItem('current_session_id', currentSessionId);
+      localStorage.setItem(storageKey, currentSessionId);
     } else {
-      localStorage.removeItem('current_session_id');
+      localStorage.removeItem(storageKey);
     }
-  }, [currentSessionId]);
+  }, [currentSessionId, activeProject]);
 
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
@@ -111,7 +112,8 @@ export default function Dashboard() {
   const fetchAllDocs = async (): Promise<DocumentItem[]> => {
     if (!authToken) return [];
     try {
-      const res = await fetch('http://localhost:8000/documents', {
+      const url = activeProject ? `http://localhost:8000/documents?project_id=${activeProject.id}` : 'http://localhost:8000/documents';
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -131,7 +133,8 @@ export default function Dashboard() {
   const fetchSidebarSessions = async () => {
     if (!authToken) return;
     try {
-      const res = await fetch('http://localhost:8000/sessions', {
+      const url = activeProject ? `http://localhost:8000/sessions?project_id=${activeProject.id}` : 'http://localhost:8000/sessions';
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       if (res.status === 401) {
@@ -149,14 +152,15 @@ export default function Dashboard() {
   useEffect(() => {
     void fetchAllDocs();
     void fetchSidebarSessions();
-  }, [authToken]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authToken, activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleNewChat = () => {
     setCurrentSessionId(undefined);
     setDraftSessionId(null);
     setDraftSessionTitle(null);
     setOptimisticSession(null);
-    localStorage.removeItem('current_session_id');
+    const storageKey = activeProject ? `current_session_id_${activeProject.id}` : 'current_session_id';
+    localStorage.removeItem(storageKey);
     setMessages([]);
     setSelectedDocs([]);
     setInputText('');
@@ -181,7 +185,8 @@ export default function Dashboard() {
         : `${docs[0]?.filename ?? 'New chat'} +${Math.max(docs.length - 1, 0)}`
     );
     setOptimisticSession(null);
-    localStorage.removeItem('current_session_id');
+    const storageKey = activeProject ? `current_session_id_${activeProject.id}` : 'current_session_id';
+    localStorage.removeItem(storageKey);
     setActiveView('chat');
   };
 
@@ -275,14 +280,15 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
-    const savedSessionId = localStorage.getItem('current_session_id');
+    const storageKey = activeProject ? `current_session_id_${activeProject.id}` : 'current_session_id';
+    const savedSessionId = localStorage.getItem(storageKey);
     if (!authToken || loading || currentSessionId) {
       return;
     }
     if (savedSessionId) {
       void handleSessionSelect(savedSessionId);
     }
-  }, [authToken, loading, currentSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [authToken, loading, currentSessionId, activeProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDocumentDeleted = (docId: number) => {
     const deletedDoc = allDocs.find(d => d.id === docId);

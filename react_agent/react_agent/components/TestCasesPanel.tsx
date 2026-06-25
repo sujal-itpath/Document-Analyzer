@@ -162,35 +162,35 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
   const renderTestCase = (tc: TestCase, moduleName: string) => {
     if (editingCase === tc.id && editForm) {
       return (
-        <div key={tc.id} className="border border-white/10 bg-[#0a0a0a] rounded-xl p-4 my-3 text-sm">
+        <div key={tc.id} className="border border-border bg-card rounded-xl p-4 my-3 text-sm">
           <div className="flex justify-between items-center mb-3">
-            <h4 className="font-bold text-blue-500">{tc.id}</h4>
+            <h4 className="font-bold text-accent">{tc.id}</h4>
             <div className="flex gap-2">
-              <button onClick={cancelEdit} className="p-1 hover:bg-white/10 rounded text-gray-400 hover:text-white transition-colors">
+              <button onClick={cancelEdit} className="p-1 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors">
                 <X size={14} />
               </button>
-              <button onClick={() => saveEdit(moduleName)} className="p-1 bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors">
+              <button onClick={() => saveEdit(moduleName)} className="p-1 bg-accent text-white rounded hover:bg-accent/80 transition-colors">
                 <Save size={14} />
               </button>
             </div>
           </div>
           <div className="space-y-3">
             <div>
-              <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Title</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground/70 mb-1 block">Title</label>
               <input 
                 type="text" 
                 value={editForm.title} 
                 onChange={e => setEditForm({...editForm, title: e.target.value})}
-                className="w-full bg-[#111] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:border-accent focus:outline-none"
               />
             </div>
             <div className="flex gap-4">
               <div className="flex-1">
-                <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Priority</label>
+                <label className="text-[10px] font-bold uppercase text-muted-foreground/70 mb-1 block">Priority</label>
                 <select 
                   value={editForm.priority}
                   onChange={e => setEditForm({...editForm, priority: e.target.value})}
-                  className="w-full bg-[#111] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white focus:border-blue-500 focus:outline-none"
+                  className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground focus:border-accent focus:outline-none"
                 >
                   <option>High</option>
                   <option>Medium</option>
@@ -199,27 +199,27 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
               </div>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Given (one per line)</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground/70 mb-1 block">Given (one per line)</label>
               <textarea
                 value={editGiven}
                 onChange={e => setEditGiven(e.target.value)}
-                className="w-full bg-[#111] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white min-h-[60px]"
+                className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground min-h-[60px] focus:border-accent focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">When (one per line)</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground/70 mb-1 block">When (one per line)</label>
               <textarea
                 value={editWhen}
                 onChange={e => setEditWhen(e.target.value)}
-                className="w-full bg-[#111] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white min-h-[60px]"
+                className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground min-h-[60px] focus:border-accent focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase text-gray-500 mb-1 block">Then (one per line)</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground/70 mb-1 block">Then (one per line)</label>
               <textarea
                 value={editThen}
                 onChange={e => setEditThen(e.target.value)}
-                className="w-full bg-[#111] border border-white/10 rounded-md px-3 py-1.5 text-sm text-white min-h-[60px]"
+                className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-sm text-foreground min-h-[60px] focus:border-accent focus:outline-none"
               />
             </div>
           </div>
@@ -230,20 +230,16 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
     const isExpanded = expandedCases[tc.id];
 
     return (
-      <div key={tc.id} className="border border-white/10 bg-[#0f0f0f] rounded-xl my-3 text-sm transition-colors group overflow-hidden">
+      <div key={tc.id} className="border border-border bg-card rounded-xl my-3 text-sm transition-colors group overflow-hidden">
         <div 
-          className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+          className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
           onClick={() => toggleTestCase(tc.id)}
         >
           <div className="flex justify-between items-start">
             <div className="flex gap-3">
-              {/* <div className="mt-1 w-[14px] h-[14px] rounded-full border border-gray-600 flex-shrink-0 flex items-center justify-center bg-[#1a1a1a]">
-                {isExpanded && <div className="w-[8px] h-[8px] rounded-full bg-blue-500" />}
-              </div> */}
               <div>
                 <div className="flex items-center gap-3 mb-1.5">
-                  {/* <span className="font-bold text-blue-500 text-sm tracking-wide">{tc.id}</span> */}
-                  <div className="font-bold text-white text-[15px] leading-snug">{tc.title}</div>
+                  <div className="font-bold text-foreground text-[15px] leading-snug">{tc.title}</div>
                   <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${tc.priority.toLowerCase() === 'high' ? 'bg-[#450a0a] text-red-500' : tc.priority.toLowerCase() === 'medium' ? 'bg-[#422006] text-yellow-500' : 'bg-[#052e16] text-green-500'}`}>
                     {tc.priority}
                   </span>
@@ -252,7 +248,7 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
             </div>
             <button 
               onClick={(e) => { e.stopPropagation(); startEdit(tc); }}
-              className="p-1.5 hover:bg-white/10 rounded text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity"
+              className="p-1.5 hover:bg-muted rounded text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
             >
               <Edit2 size={15} />
             </button>
@@ -260,12 +256,12 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
         </div>
         
         {isExpanded && (
-          <div className="border-t border-white/10 px-5 py-5 text-[14px] bg-[#000000]">
+          <div className="border-t border-border px-5 py-5 text-[14px] bg-background/50">
             <div className="space-y-5">
               {tc.acceptance_criteria.given && tc.acceptance_criteria.given.length > 0 && (
                 <div>
-                  <h5 className="font-bold text-gray-300 mb-2">Given</h5>
-                  <ul className="list-disc pl-5 space-y-1 text-gray-200 marker:text-gray-500">
+                  <h5 className="font-bold text-foreground/80 mb-2">Given</h5>
+                  <ul className="list-disc pl-5 space-y-1 text-foreground/90 marker:text-muted-foreground/70">
                     {tc.acceptance_criteria.given.map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
@@ -274,8 +270,8 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
               )}
               {tc.acceptance_criteria.when && tc.acceptance_criteria.when.length > 0 && (
                 <div>
-                  <h5 className="font-bold text-blue-400 mb-2">When</h5>
-                  <ul className="list-disc pl-5 space-y-1 text-gray-200 marker:text-gray-500">
+                  <h5 className="font-bold text-accent mb-2">When</h5>
+                  <ul className="list-disc pl-5 space-y-1 text-foreground/90 marker:text-muted-foreground/70">
                     {tc.acceptance_criteria.when.map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
@@ -284,8 +280,8 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
               )}
               {tc.acceptance_criteria.then && tc.acceptance_criteria.then.length > 0 && (
                 <div>
-                  <h5 className="font-bold text-green-400 mb-2">Then</h5>
-                  <ul className="list-disc pl-5 space-y-1 text-gray-200 marker:text-gray-500">
+                  <h5 className="font-bold text-green-500 mb-2">Then</h5>
+                  <ul className="list-disc pl-5 space-y-1 text-foreground/90 marker:text-muted-foreground/70">
                     {tc.acceptance_criteria.then.map((item, idx) => (
                       <li key={idx}>{item}</li>
                     ))}
@@ -300,24 +296,24 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
   };
 
   return (
-    <div className="h-full flex flex-col bg-[#0a0a0a] text-white border-l border-white/10">
-      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-[#111] flex-shrink-0">
+    <div className="h-full flex flex-col bg-background text-foreground border-l border-border">
+      <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-card flex-shrink-0">
         <div>
-          <h2 className="font-black text-lg text-white">Test Cases</h2>
-          <p className="text-xs text-gray-400 font-medium">
+          <h2 className="font-black text-lg text-foreground">Test Cases</h2>
+          <p className="text-xs text-muted-foreground font-medium">
             AI-generated BDD test cases
           </p>
         </div>
-        <div className="flex bg-[#1a1a1a] p-1 rounded-lg border border-white/5">
+        <div className="flex bg-muted p-1 rounded-lg border border-border/50">
           <button 
             onClick={() => setActiveTab('current')}
-            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeTab === 'current' ? 'bg-[#333] shadow-sm text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeTab === 'current' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             Current
           </button>
           <button 
             onClick={() => setActiveTab('history')}
-            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeTab === 'history' ? 'bg-[#333] shadow-sm text-white' : 'text-gray-400 hover:text-white'}`}
+            className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${activeTab === 'history' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             History
           </button>
@@ -329,8 +325,8 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
           currentData ? (
             <div className="space-y-6">
               <div className="flex justify-between items-center text-sm">
-                <span className="font-medium text-gray-400">Generated <span className="font-black text-white">{currentData.total_cases}</span> cases for <span className="font-bold text-white">{currentData.filename}</span></span>
-                <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded-md text-xs font-bold uppercase">{currentData.test_type}</span>
+                <span className="font-medium text-muted-foreground">Generated <span className="font-black text-foreground">{currentData.total_cases}</span> cases for <span className="font-bold text-foreground">{currentData.filename}</span></span>
+                <span className="px-2 py-1 bg-accent/10 text-accent rounded-md text-xs font-bold uppercase">{currentData.test_type}</span>
               </div>
               
               <div className="space-y-6">
@@ -338,10 +334,10 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
                   <div key={moduleName} className="mb-6">
                     <button 
                       onClick={() => toggleModule(moduleName)}
-                      className="w-full flex items-center justify-between py-2 text-white hover:text-gray-300 transition-colors group"
+                      className="w-full flex items-center justify-between py-2 text-foreground hover:text-foreground/80 transition-colors group"
                     >
-                      <span className="font-black text-base">{moduleName} <span className="text-gray-500 font-normal">({cases.length})</span></span>
-                      {expandedModules[moduleName] ? <ChevronDown size={18} className="text-gray-500 group-hover:text-gray-300 transition-colors" /> : <ChevronRight size={18} className="text-gray-500 group-hover:text-gray-300 transition-colors" />}
+                      <span className="font-black text-base">{moduleName} <span className="text-muted-foreground font-normal">({cases.length})</span></span>
+                      {expandedModules[moduleName] ? <ChevronDown size={18} className="text-muted-foreground group-hover:text-foreground/80 transition-colors" /> : <ChevronRight size={18} className="text-muted-foreground group-hover:text-foreground/80 transition-colors" />}
                     </button>
                     {expandedModules[moduleName] && (
                       <div className="pt-2">
