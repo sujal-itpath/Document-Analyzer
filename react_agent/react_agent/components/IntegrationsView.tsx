@@ -3,7 +3,6 @@ import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
 import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, Kanban, ArrowLeft, ChevronDown, Settings } from 'lucide-react';
 import { apiUrl, authHeaders } from '../lib/api';
-import JiraAssistantView from './JiraAssistantView';
 import GlobalJiraSettingsView from './GlobalJiraSettingsView';
 
 interface IntegrationsViewProps {
@@ -262,12 +261,6 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
       setSyncingDocId(null);
     }
   };
-
-  // Jira Assistant View
-  if (activeConnector === 'jira') {
-    return <JiraAssistantView onBack={() => setActiveConnector(null)} projectId={projectId} />;
-  }
-
   // Google Docs View (Detailed list)
   if (activeConnector === 'google') {
     return (
@@ -517,9 +510,6 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
                 <div className="flex gap-2">
                   <button onClick={handleDisconnectJira} className="flex-1 px-4 py-3 bg-red-500/10 text-red-500 hover:bg-red-500/20 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
                     Disconnect
-                  </button>
-                  <button onClick={() => setActiveConnector('jira')} className="flex-[2] px-4 py-3 bg-accent text-white shadow-lg shadow-accent/30 hover:shadow-accent/50 font-bold rounded-xl transition-all text-sm flex items-center justify-center gap-2">
-                    Create Ticket <ChevronDown size={16} className="-rotate-90" />
                   </button>
                 </div>
               ) : (
