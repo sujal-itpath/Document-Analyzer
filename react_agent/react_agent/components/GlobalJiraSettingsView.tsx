@@ -1,0 +1,209 @@
+import React, { useState, useEffect } from 'react';
+import { Save, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { apiUrl, authHeaders } from '../lib/api';
+
+const GlobalJiraSettingsView: React.FC = () => {
+  const { token } = useAuth();
+  
+  const [formData, setFormData] = useState({
+    jira_base_url: '',
+    jira_email: '',
+    jira_api_token: '',
+    project_key: '',
+    issue_type: 'Task'
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string, type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    fetchGlobalConfig();
+  }, []);
+
+  const fetchGlobalConfig = async () => {
+    try {
+      const res = await fetch(apiUrl('/jira/global-config'), { headers: authHeaders(token) });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.jira_base_url) {
+          setFormData({
+            jira_base_url: data.jira_base_url || '',
+            jira_email: data.jira_email || '',
+            jira_api_token: data.jira_api_token || '',
+            project_key: data.project_key || '',
+            issue_type: data.issue_type || 'Task'
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to fetch global config:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch(apiUrl('/jira/global-config'), {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify(formData)
+      });
+      if (res.ok) {
+        setMessage({ text: "Global Jira configuration saved successfully.", type: 'success' });
+      } else {
+        const err = await res.json();
+        const errorText = typeof err.detail === 'string' ? err.detail : 
+                          (Array.isArray(err.detail) ? err.detail.map((e: any) => e.msg).join(", ") : 
+                           "Failed to save configuration.");
+        setMessage({ text: errorText, type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: "Network error occurred.", type: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleTestGenerate = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const res = await fetch(apiUrl('/jira/generate-ticket'), {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({
+          summary: "Test Ticket from Global Config",
+          description: "This is a test ticket generated to verify the global Jira configuration.",
+          acceptance_criteria: "Ticket is created successfully using the API token."
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setMessage({ text: `Ticket created successfully! Key: ${data.key}`, type: 'success' });
+      } else {
+        const err = await res.json();
+        const errorText = typeof err.detail === 'string' ? err.detail : 
+                          (Array.isArray(err.detail) ? err.detail.map((e: any) => e.msg).join(", ") : 
+                           "Failed to generate ticket.");
+        setMessage({ text: errorText, type: 'error' });
+      }
+    } catch (err) {
+      setMessage({ text: "Network error occurred.", type: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-accent" /></div>;
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm">
+      <h3 className="text-xl font-bold mb-4">Global Jira Configuration</h3>
+      <p className="text-muted-foreground text-sm mb-6">
+        Configure the system-wide Jira connection using Basic Authentication (Email + API Token). Tickets generated using this flow will be authored by this user account.
+      </p>
+
+      {message && (
+        <div className={`p-4 rounded-lg mb-6 flex items-start gap-3 ${message.type === 'success' ? 'bg-green-500/10 text-green-600' : 'bg-red-500/10 text-red-600'}`}>
+          {message.type === 'success' ? <CheckCircle size={20} className="shrink-0" /> : <AlertCircle size={20} className="shrink-0" />}
+          <p className="text-sm font-medium">{message.text}</p>
+        </div>
+      )}
+
+      <form onSubmit={handleSave} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold">Jira Base URL</label>
+            <input 
+              type="url" 
+              required
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent"
+              placeholder="https://yourcompany.atlassian.net"
+              value={formData.jira_base_url}
+              onChange={e => setFormData({...formData, jira_base_url: e.target.value})}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold">Jira Email</label>
+            <input 
+              type="email" 
+              required
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent"
+              placeholder="user@example.com"
+              value={formData.jira_email}
+              onChange={e => setFormData({...formData, jira_email: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-sm font-bold">Jira API Token</label>
+          <input 
+            type="password" 
+            required
+            className="w-full bg-background border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent"
+            placeholder="Enter API Token..."
+            value={formData.jira_api_token}
+            onChange={e => setFormData({...formData, jira_api_token: e.target.value})}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-bold">Default Project Key</label>
+            <input 
+              type="text" 
+              required
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent uppercase"
+              placeholder="e.g. DTC"
+              value={formData.project_key}
+              onChange={e => setFormData({...formData, project_key: e.target.value.toUpperCase()})}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-bold">Default Issue Type</label>
+            <input 
+              type="text" 
+              required
+              className="w-full bg-background border border-border rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-accent capitalize"
+              placeholder="e.g. Task"
+              value={formData.issue_type}
+              onChange={e => setFormData({...formData, issue_type: e.target.value})}
+            />
+          </div>
+        </div>
+
+        <div className="pt-4 flex items-center gap-4 border-t border-border mt-6">
+          <button 
+            type="submit" 
+            disabled={saving}
+            className="px-6 py-2 bg-accent text-white rounded-lg font-bold hover:bg-accent/90 transition-colors flex items-center gap-2"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Save Configuration
+          </button>
+          
+          <button 
+            type="button"
+            onClick={handleTestGenerate}
+            disabled={saving || !formData.project_key}
+            className="px-6 py-2 bg-background border border-border hover:bg-muted text-foreground rounded-lg font-bold transition-colors flex items-center gap-2"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+            Test Ticket Generation
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+export default GlobalJiraSettingsView;

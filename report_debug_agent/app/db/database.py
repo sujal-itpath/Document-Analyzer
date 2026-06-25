@@ -67,6 +67,16 @@ class UserIntegration(Base):
     
     user = relationship("User", back_populates="integrations")
 
+class GlobalJiraConfig(Base):
+    __tablename__ = "global_jira_config"
+    id = Column(Integer, primary_key=True, index=True)
+    jira_base_url = Column(String, nullable=False)
+    jira_email = Column(String, nullable=False)
+    jira_api_token = Column(String, nullable=False)
+    project_key = Column(String, nullable=True)
+    issue_type = Column(String, nullable=True)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
 class JiraTicketDraft(Base):
     __tablename__ = "jira_ticket_drafts"
     id = Column(String, primary_key=True) # UUID

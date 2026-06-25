@@ -1,13 +1,18 @@
 import requests
 from sqlalchemy.orm import Session
-from app.db.database import UserIntegration
+from app.db.database import UserIntegration, GlobalJiraConfig
 import json
+from requests.auth import HTTPBasicAuth
 
 class JiraService:
     def __init__(self, db: Session, user_id: int):
         self.db = db
         self.user_id = user_id
+        self.global_config = self._get_global_config()
         self.integration = self._get_integration()
+
+    def _get_global_config(self):
+        return self.db.query(GlobalJiraConfig).first()
 
     def _get_integration(self):
         integration = self.db.query(UserIntegration).filter(
@@ -17,29 +22,47 @@ class JiraService:
         return integration
 
     def is_connected(self):
+        if self.global_config and self.global_config.jira_api_token:
+            return True
         return self.integration is not None and self.integration.access_token is not None
 
     def get_cloud_id(self):
-        if not self.is_connected() or not self.integration.metadata_json:
+        if not self.integration or not self.integration.metadata_json:
             return None
         metadata = json.loads(self.integration.metadata_json)
         return metadata.get("cloud_id")
 
     def _get_headers(self):
-        if not self.is_connected():
-            raise Exception("Jira is not connected")
+        if not self.integration or not self.integration.access_token:
+            raise Exception("Jira OAuth is not connected")
         return {
             "Authorization": f"Bearer {self.integration.access_token}",
             "Accept": "application/json"
         }
 
-    def get_projects(self):
+    def _get_request_kwargs(self, endpoint_path: str):
+        if self.global_config and self.global_config.jira_api_token:
+            base_url = self.global_config.jira_base_url.rstrip('/')
+            url = f"{base_url}/rest/api/3/{endpoint_path}"
+            return {
+                "url": url,
+                "auth": HTTPBasicAuth(self.global_config.jira_email, self.global_config.jira_api_token),
+                "headers": {"Accept": "application/json"}
+            }
+        
         cloud_id = self.get_cloud_id()
         if not cloud_id:
-            raise Exception("No Jira cloud ID found")
+            raise Exception("No Jira connection found (neither global nor OAuth)")
             
-        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project"
-        response = requests.get(url, headers=self._get_headers())
+        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/{endpoint_path}"
+        return {
+            "url": url,
+            "headers": self._get_headers()
+        }
+
+    def get_projects(self):
+        kwargs = self._get_request_kwargs("project")
+        response = requests.get(**kwargs)
         
         if not response.ok:
             raise Exception(f"Failed to fetch projects: {response.text}")
@@ -47,12 +70,8 @@ class JiraService:
         return response.json()
 
     def get_issue_types(self, project_id_or_key: str):
-        cloud_id = self.get_cloud_id()
-        if not cloud_id:
-            raise Exception("No Jira cloud ID found")
-            
-        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/project/{project_id_or_key}"
-        response = requests.get(url, headers=self._get_headers())
+        kwargs = self._get_request_kwargs(f"project/{project_id_or_key}")
+        response = requests.get(**kwargs)
         
         if not response.ok:
             raise Exception(f"Failed to fetch issue types: {response.text}")
@@ -61,10 +80,6 @@ class JiraService:
         return project_data.get("issueTypes", [])
 
     def create_ticket(self, project_id: str, issue_type_name: str, summary: str, description: str, acceptance_criteria: str) -> dict:
-        cloud_id = self.get_cloud_id()
-        if not cloud_id:
-            raise Exception("No Jira cloud ID found")
-            
         # Format description to Atlassian Document Format (ADF)
         # For simplicity, we use text blocks.
         adf_description = {
@@ -89,15 +104,15 @@ class JiraService:
         
         payload = {
             "fields": {
-                "project": {"id": project_id},
+                "project": {"id": project_id} if project_id.isdigit() else {"key": project_id},
                 "summary": summary,
                 "description": adf_description,
                 "issuetype": {"name": issue_type_name}
             }
         }
         
-        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue"
-        response = requests.post(url, headers=self._get_headers(), json=payload)
+        kwargs = self._get_request_kwargs("issue")
+        response = requests.post(json=payload, **kwargs)
         
         if not response.ok:
             raise Exception(f"Failed to create ticket: {response.text}")
@@ -105,10 +120,6 @@ class JiraService:
         return response.json()
 
     def add_comment(self, issue_id_or_key: str, comment_text: str) -> dict:
-        cloud_id = self.get_cloud_id()
-        if not cloud_id:
-            raise Exception("No Jira cloud ID found")
-            
         adf_comment = {
             "version": 1,
             "type": "doc",
@@ -120,8 +131,8 @@ class JiraService:
             ]
         }
         
-        url = f"https://api.atlassian.com/ex/jira/{cloud_id}/rest/api/3/issue/{issue_id_or_key}/comment"
-        response = requests.post(url, headers=self._get_headers(), json={"body": adf_comment})
+        kwargs = self._get_request_kwargs(f"issue/{issue_id_or_key}/comment")
+        response = requests.post(json={"body": adf_comment}, **kwargs)
         
         if not response.ok:
             raise Exception(f"Failed to add comment: {response.text}")

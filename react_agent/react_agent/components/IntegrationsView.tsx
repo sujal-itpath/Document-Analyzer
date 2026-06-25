@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDialog } from './ui/Dialog';
-import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, Kanban, ArrowLeft, ChevronDown } from 'lucide-react';
+import { Link2, Loader2, CheckCircle2, FileText, RefreshCw, XCircle, CloudOff, Kanban, ArrowLeft, ChevronDown, Settings } from 'lucide-react';
 import { apiUrl, authHeaders } from '../lib/api';
 import JiraAssistantView from './JiraAssistantView';
+import GlobalJiraSettingsView from './GlobalJiraSettingsView';
 
 interface IntegrationsViewProps {
   onSyncComplete?: () => void;
@@ -528,6 +529,10 @@ const IntegrationsView: React.FC<IntegrationsViewProps> = ({ onSyncComplete, pro
               )}
             </div>
           </div>
+        </div>
+        
+        <div className="mt-8">
+          <GlobalJiraSettingsView />
         </div>
       </div>
     </div>

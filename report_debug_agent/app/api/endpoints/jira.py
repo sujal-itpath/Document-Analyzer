@@ -1,12 +1,75 @@
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from app.db.database import get_db, User
+from app.db.database import get_db, User, GlobalJiraConfig
 from app.api.endpoints.auth import get_current_user
 from app.services.jira_service import JiraService
+from pydantic import BaseModel
+from typing import Optional
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+class GlobalConfigRequest(BaseModel):
+    jira_base_url: str
+    jira_email: str
+    jira_api_token: str
+    project_key: Optional[str] = None
+    issue_type: Optional[str] = None
+
+@router.get("/global-config")
+def get_global_config(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    config = db.query(GlobalJiraConfig).first()
+    if not config:
+        return {}
+    return {
+        "jira_base_url": config.jira_base_url,
+        "jira_email": config.jira_email,
+        "jira_api_token": "********" if config.jira_api_token else "",
+        "project_key": config.project_key,
+        "issue_type": config.issue_type,
+    }
+
+@router.post("/global-config")
+def save_global_config(req: GlobalConfigRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    config = db.query(GlobalJiraConfig).first()
+    if not config:
+        config = GlobalJiraConfig()
+        db.add(config)
+    
+    config.jira_base_url = req.jira_base_url
+    config.jira_email = req.jira_email
+    if req.jira_api_token and req.jira_api_token != "********":
+        config.jira_api_token = req.jira_api_token
+    config.project_key = req.project_key
+    config.issue_type = req.issue_type
+    
+    db.commit()
+    return {"status": "success"}
+
+class TestTicketRequest(BaseModel):
+    summary: str
+    description: str
+    acceptance_criteria: str
+
+@router.post("/generate-ticket")
+def generate_test_ticket(req: TestTicketRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    service = JiraService(db, current_user.id)
+    config = db.query(GlobalJiraConfig).first()
+    if not config or not config.project_key:
+        raise HTTPException(status_code=400, detail="Global Jira config or project key not set")
+    try:
+        res = service.create_ticket(
+            project_id=config.project_key,
+            issue_type_name=config.issue_type or "Task",
+            summary=req.summary,
+            description=req.description,
+            acceptance_criteria=req.acceptance_criteria
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error creating test ticket: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
 def get_jira_status(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
