@@ -20,8 +20,8 @@ def generate_jira_ticket_tool(
     
     Args:
         summary (str): The short title or summary of the ticket.
-        description (str): The detailed description of the ticket.
-        acceptance_criteria (str): The acceptance criteria for the ticket.
+        description (str): The detailed description of the ticket. IMPORTANT: Use Jira Wiki Markup formatting (e.g. h1., h2., *bold*, - list). Do NOT use Markdown (like #, ##, **bold**).
+        acceptance_criteria (str): The acceptance criteria for the ticket. IMPORTANT: Use Jira Wiki Markup formatting.
         issue_type (str, optional): The type of issue (e.g., "Story", "Bug", "Task"). If omitted, it uses the global default.
         attach_test_cases_for_filename (str, optional): If the user wants to attach test cases to this ticket, provide the filename of the document here. The tool will automatically fetch the latest test cases for this document from the DB and append them to the Jira ticket description.
         
@@ -51,17 +51,17 @@ def generate_jira_ticket_tool(
             if tc_run:
                 tc_records = db.query(TestCaseRecord).filter(TestCaseRecord.run_id == tc_run.id).all()
                 if tc_records:
-                    tc_markdown = f"\n\n----\n## Attached Test Cases (from {attach_test_cases_for_filename})\n"
+                    tc_markdown = f"\n\n----\nh2. Attached Test Cases (from {attach_test_cases_for_filename})\n"
                     for rec in tc_records:
-                        tc_markdown += f"\n### {rec.title} ({rec.priority} Priority, {rec.type})\n"
+                        tc_markdown += f"\nh3. {rec.title} ({rec.priority} Priority, {rec.type})\n"
                         try:
                             ac = json.loads(rec.acceptance_criteria)
                             if ac.get("given"):
-                                tc_markdown += "**Given**\n" + "".join(f"- {g}\n" for g in ac["given"])
+                                tc_markdown += "*Given*\n" + "".join(f"- {g}\n" for g in ac["given"])
                             if ac.get("when"):
-                                tc_markdown += "**When**\n" + "".join(f"- {w}\n" for w in ac["when"])
+                                tc_markdown += "*When*\n" + "".join(f"- {w}\n" for w in ac["when"])
                             if ac.get("then"):
-                                tc_markdown += "**Then**\n" + "".join(f"- {t}\n" for t in ac["then"])
+                                tc_markdown += "*Then*\n" + "".join(f"- {t}\n" for t in ac["then"])
                         except json.JSONDecodeError:
                             pass
                     final_description += tc_markdown
