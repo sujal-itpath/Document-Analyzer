@@ -440,6 +440,7 @@ export default function Dashboard() {
           question: userMessage,
           thread_id: requestSessionId,
           document_ids: requestSessionId ? [] : requestDocumentIds,
+          project_id: activeProject?.id,
         }),
       });
 
