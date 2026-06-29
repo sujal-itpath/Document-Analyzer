@@ -30,11 +30,12 @@ export interface TestCaseResponseData {
 interface TestCasesPanelProps {
   documents: { id: number; filename: string; }[];
   projectId?: number;
+  sessionId?: string;
   testCasesData?: TestCaseResponseData | null;
   onGenerateTestCases?: (filename: string, testType: string) => Promise<TestCaseResponseData>;
 }
 
-export default function TestCasesPanel({ documents, projectId, testCasesData: initialData, onGenerateTestCases }: TestCasesPanelProps) {
+export default function TestCasesPanel({ documents, projectId, sessionId, testCasesData: initialData, onGenerateTestCases }: TestCasesPanelProps) {
   const { token } = useAuth();
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [currentData, setCurrentData] = useState<TestCaseResponseData | null>(initialData || null);
@@ -68,7 +69,11 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
     setIsLoadingHistory(true);
     try {
       const filename = documents[0].filename; // Just use first doc for history
-      const res = await fetch(`http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}&project_id=${projectId || ''}`, {
+      let url = `http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`;
+      if (projectId) url += `&project_id=${projectId}`;
+      if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
+      
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -86,7 +91,7 @@ export default function TestCasesPanel({ documents, projectId, testCasesData: in
     if (activeTab === 'history') {
       fetchHistory();
     }
-  }, [activeTab, documents, projectId, token]);
+  }, [activeTab, documents, projectId, sessionId, token]);
 
   const toggleModule = (moduleName: string) => {
     setExpandedModules(prev => ({ ...prev, [moduleName]: !prev[moduleName] }));

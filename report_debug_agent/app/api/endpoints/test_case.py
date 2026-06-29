@@ -90,13 +90,18 @@ async def generate_test_cases_endpoint(
 async def get_test_case_history(
     filename: Optional[str] = None,
     project_id: Optional[str] = None,
+    session_id: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     query = db.query(TestCaseRun)
     if filename:
         query = query.filter(TestCaseRun.filename == filename)
-    if project_id is not None and str(project_id).strip() != "":
+    if session_id is not None and str(session_id).strip() != "" and str(session_id) != "undefined":
+        # Include test cases from the specific session, or legacy test cases (where session_id is NULL)
+        from sqlalchemy import or_
+        query = query.filter(or_(TestCaseRun.session_id == str(session_id), TestCaseRun.session_id.is_(None)))
+    if project_id is not None and str(project_id).strip() != "" and str(project_id) != "undefined":
         try:
             query = query.filter(TestCaseRun.project_id == int(project_id))
         except ValueError:

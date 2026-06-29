@@ -8,7 +8,8 @@ def run_test_case_generation_and_save(
     db: Session,
     filename: str,
     test_type: str,
-    project_id: int | None = None
+    project_id: int | None = None,
+    session_id: str | None = None
 ) -> TestCaseResponseData:
     
     # 1. Fetch file_path from DB
@@ -62,7 +63,8 @@ def run_test_case_generation_and_save(
         filename=filename,
         test_type=test_type or "Manual",
         total_cases=total_cases,
-        project_id=project_id
+        project_id=project_id,
+        session_id=session_id
     )
     db.add(tc_run)
     db.commit()

@@ -154,6 +154,7 @@ class TestCaseRun(Base):
     total_cases = Column(Integer)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
+    session_id = Column(String, ForeignKey("chat_sessions.id"), nullable=True)
 
     records = relationship("TestCaseRecord", back_populates="run", cascade="all, delete-orphan")
 
@@ -221,6 +222,13 @@ def _ensure_chat_session_columns():
         if "avatar_color" not in user_columns:
             with engine.begin() as connection:
                 connection.execute(text("ALTER TABLE users ADD COLUMN avatar_color VARCHAR"))
+
+    # Check test_case_runs
+    if "test_case_runs" in existing_tables:
+        run_columns = {col["name"] for col in inspector.get_columns("test_case_runs")}
+        if "session_id" not in run_columns:
+            with engine.begin() as connection:
+                connection.execute(text("ALTER TABLE test_case_runs ADD COLUMN session_id VARCHAR"))
 
     logger.info("DB schema check complete.")
 

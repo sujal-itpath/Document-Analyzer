@@ -59,6 +59,38 @@ export default function Dashboard() {
   const [activeDocumentId, setActiveDocumentId] = useState<number | undefined>(undefined);
   const [testCasesData, setTestCasesData] = useState<TestCaseResponseData | null>(null);
 
+  // Automatically fetch latest test cases when document selection changes
+  useEffect(() => {
+    const loadTestCases = async () => {
+      if (!authToken || selectedDocs.length === 0) {
+        setTestCasesData(null);
+        return;
+      }
+      try {
+        const filename = selectedDocs[0].filename;
+        const sessionId = currentSessionIdRef.current;
+        const projectId = activeProject?.id;
+        
+        let url = `http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`;
+        if (projectId) url += `&project_id=${projectId}`;
+        if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
+        
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${authToken}` } });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.data && data.data.length > 0) {
+            setTestCasesData(data.data[0]);
+          } else {
+            setTestCasesData(null);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load test cases on doc change:", e);
+      }
+    };
+    loadTestCases();
+  }, [selectedDocs, authToken]);
+
   const handleDividerMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     document.body.style.cursor = 'col-resize';
@@ -167,7 +199,6 @@ export default function Dashboard() {
     setQuotedText(undefined);
     setIsSplitView(false);
     setSplitViewContent('document');
-    setTestCasesData(null);
     setActiveDocumentId(undefined);
     setActiveView('doc-select');
   };
@@ -219,7 +250,6 @@ export default function Dashboard() {
       setQuotedText(undefined);
       setIsSplitView(false);
       setSplitViewContent('document');
-      setTestCasesData(null);
       setActiveDocumentId(undefined);
       setActiveView('chat');
     } catch (err) {
@@ -383,7 +413,13 @@ export default function Dashboard() {
   const handleTestCasesGenerated = async (filename: string) => {
     if (!authToken) return;
     try {
-      const res = await fetch(`http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`, {
+      const sessionId = currentSessionIdRef.current;
+      const projectId = activeProject?.id;
+      let url = `http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`;
+      if (projectId) url += `&project_id=${projectId}`;
+      if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
+        
+      const res = await fetch(url, {
         headers: {
           Authorization: `Bearer ${authToken}`,
         },
@@ -402,7 +438,13 @@ export default function Dashboard() {
       // Wait for 1 second and retry once, sometimes history takes a moment to persist
       setTimeout(async () => {
         try {
-          const res = await fetch(`http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`, {
+          const sessionId = currentSessionIdRef.current;
+          const projectId = activeProject?.id;
+          let url = `http://localhost:8000/test-cases/history?filename=${encodeURIComponent(filename)}`;
+          if (projectId) url += `&project_id=${projectId}`;
+          if (sessionId) url += `&session_id=${encodeURIComponent(sessionId)}`;
+          
+          const res = await fetch(url, {
             headers: { Authorization: `Bearer ${authToken}` },
           });
           const data = await res.json();
@@ -700,6 +742,8 @@ export default function Dashboard() {
                     ) : (
                       <TestCasesPanel 
                         documents={selectedDocs}
+                        projectId={activeProject?.id}
+                        sessionId={currentSessionId}
                         testCasesData={testCasesData}
                         onGenerateTestCases={undefined}
                       />
