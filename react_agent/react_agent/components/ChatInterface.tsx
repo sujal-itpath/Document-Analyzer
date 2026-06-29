@@ -166,15 +166,30 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return { ...msg, displayContent, parsedSuggestions, testCasesFilename };
   }), [messages]);
 
+  const isSessionLoadRef = useRef(false);
+  const prevMessagesRef = useRef<Message[]>([]);
+
+  // Calculate session load synchronously during render
+  if (messages !== prevMessagesRef.current) {
+    if (messages.length > 0) {
+      if (prevMessagesRef.current.length === 0 || messages[0] !== prevMessagesRef.current[0]) {
+        isSessionLoadRef.current = true;
+      } else {
+        isSessionLoadRef.current = false;
+      }
+    }
+    prevMessagesRef.current = messages;
+  }
+
   // Trigger test cases callback if the LAST message contains the tag
   useEffect(() => {
-    if (messages.length === 0 || isThinking) return;
+    if (messages.length === 0 || isThinking || isSessionLoadRef.current) return;
     const lastMsg = processedMessages[processedMessages.length - 1];
     if (lastMsg.role === 'agent' && lastMsg.testCasesFilename && onTestCasesGenerated) {
       // Fire it once per unique message generation
       onTestCasesGenerated(lastMsg.testCasesFilename);
     }
-  }, [processedMessages, isThinking, onTestCasesGenerated]);
+  }, [processedMessages, isThinking, onTestCasesGenerated, messages.length]);
 
   const suggestions = useMemo<string[]>(() => {
     const lastAgent = [...processedMessages].reverse().find(m => m.role === 'agent') as any;

@@ -326,6 +326,9 @@ export default function Dashboard() {
       formData.append('files', files[i]);
     }
     formData.append('overwrite', 'false');
+    if (activeProject) {
+      formData.append('project_id', activeProject.id.toString());
+    }
 
     try {
       const res = await fetch(apiUrl('/upload'), {
@@ -440,6 +443,7 @@ export default function Dashboard() {
           question: userMessage,
           thread_id: requestSessionId,
           document_ids: requestSessionId ? [] : requestDocumentIds,
+          project_id: activeProject?.id,
         }),
       });
 
